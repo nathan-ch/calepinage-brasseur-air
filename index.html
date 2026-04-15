@@ -1,0 +1,4617 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Calepinage BRASSE</title>
+  <style>
+    :root {
+      --bg: #f3f4f6;
+      --panel: #ffffff;
+      --panel-strong: #ffffff;
+      --ink: #111827;
+      --muted: #6b7280;
+      --line: #d6d9df;
+      --accent: #1f4f82;
+      --accent-soft: #e9eff6;
+      --amber: #8a5a00;
+      --amber-soft: #fff6e5;
+      --danger: #b42318;
+      --danger-soft: #fef3f2;
+      --shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 1px 3px rgba(16, 24, 40, 0.08);
+      --radius: 14px;
+      --radius-sm: 10px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--ink);
+      background: var(--bg);
+      line-height: 1.45;
+    }
+
+    body::before {
+      display: none;
+    }
+
+    .page {
+      position: relative;
+      max-width: 1460px;
+      margin: 0 auto;
+      padding: 20px 16px 40px;
+    }
+
+    .hero {
+      display: grid;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .hero-card {
+      padding: 14px 16px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      box-shadow: var(--shadow);
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-size: 0.74rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 8px 0 4px;
+      font-size: clamp(1.4rem, 2vw, 1.9rem);
+      line-height: 1.15;
+      letter-spacing: -0.02em;
+      max-width: none;
+    }
+
+    .hero p {
+      margin: 0;
+      max-width: 78ch;
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+
+    .layout {
+      display: grid;
+      gap: 16px;
+      grid-template-columns: minmax(320px, 400px) minmax(0, 1fr);
+      align-items: start;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .panel-body {
+      padding: 18px;
+    }
+
+    .section-title {
+      margin: 0 0 4px;
+      font-size: 0.98rem;
+      letter-spacing: 0.02em;
+    }
+
+    .section-subtitle {
+      margin: 0 0 18px;
+      color: var(--muted);
+      font-size: 0.94rem;
+    }
+
+    form {
+      display: grid;
+      gap: 14px;
+    }
+
+    .field-grid {
+      display: grid;
+      gap: 14px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .field {
+      display: grid;
+      gap: 7px;
+    }
+
+    label {
+      font-size: 0.92rem;
+      font-weight: 700;
+      color: var(--ink);
+    }
+
+    input,
+    select,
+    button {
+      font: inherit;
+    }
+
+    input,
+    select {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--ink);
+      transition: border-color 120ms ease, box-shadow 120ms ease;
+    }
+
+    input:focus,
+    select:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(31, 79, 130, 0.12);
+    }
+
+    .hint {
+      margin-top: -2px;
+      color: var(--muted);
+      font-size: 0.83rem;
+    }
+
+    .stack {
+      display: grid;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .check-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .check {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: #f9fafb;
+      border: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .check input {
+      width: auto;
+      margin-top: 4px;
+    }
+
+    .button-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      padding-top: 6px;
+    }
+
+    button {
+      border: 1px solid transparent;
+      padding: 10px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+    }
+
+    button:hover {
+      box-shadow: none;
+    }
+
+    .primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    .primary:hover {
+      background: #183f68;
+      border-color: #183f68;
+    }
+
+    .secondary {
+      background: #fff;
+      border-color: var(--line);
+      color: var(--ink);
+    }
+
+    .secondary:hover {
+      background: #f9fafb;
+    }
+
+    .results-shell {
+      display: grid;
+      gap: 18px;
+      min-width: 0;
+    }
+
+    .summary-grid {
+      display: grid;
+      gap: 18px;
+      margin: 10px 0 18px;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    }
+
+    .summary-card {
+      padding: 20px;
+      border-radius: 12px;
+      background: #fff;
+      border: 1px solid var(--line);
+    }
+
+    .report-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin: 0 0 14px;
+      padding: 16px 18px;
+      border-radius: 12px;
+      background: #f9fafb;
+      border: 1px solid var(--line);
+    }
+
+    .report-kicker {
+      margin: 0 0 4px;
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .report-title {
+      margin: 0;
+      font-size: 1.2rem;
+      line-height: 1.2;
+    }
+
+    .report-context {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .report-meta {
+      display: grid;
+      gap: 10px;
+      margin: 0 0 18px;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    }
+
+    .report-meta-card {
+      padding: 12px 14px;
+      border-radius: 10px;
+      background: #f9fafb;
+      border: 1px solid var(--line);
+    }
+
+    .report-meta-card strong {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--muted);
+      font-size: 0.78rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .report-meta-card span {
+      display: block;
+      font-size: 0.92rem;
+      font-weight: 600;
+    }
+
+    .report-actions {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
+
+    .summary-card strong,
+    .metric-card strong {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 0.83rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+    }
+
+    .summary-card span,
+    .metric-card span {
+      display: block;
+      font-size: 1.4rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+    }
+
+    .notice {
+      padding: 16px 18px;
+      border-radius: 10px;
+      background: #fff;
+      border: 1px solid var(--line);
+      color: var(--muted);
+    }
+
+    .notice strong {
+      color: var(--ink);
+    }
+
+    .notice.warning {
+      background: var(--amber-soft);
+      border-color: rgba(184, 109, 33, 0.24);
+    }
+
+    .notice.danger {
+      background: var(--danger-soft);
+      border-color: rgba(162, 67, 42, 0.24);
+    }
+
+    .result-card {
+      display: grid;
+      gap: 16px;
+      padding: 18px;
+      border-radius: 12px;
+      background: #fff;
+      border: 1px solid var(--line);
+    }
+
+    .result-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
+
+    .result-title {
+      margin: 0;
+      font-size: 1.2rem;
+    }
+
+    .result-subtitle {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    .badge-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 5px 10px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      background: #f3f4f6;
+      color: #374151;
+      border: 1px solid var(--line);
+    }
+
+    .badge.warn {
+      background: var(--amber-soft);
+      color: var(--amber);
+    }
+
+    .badge.alert {
+      background: var(--danger-soft);
+      color: var(--danger);
+    }
+
+    .result-grid {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+      align-items: stretch;
+    }
+
+    .result-grid > * {
+      min-width: 0;
+    }
+
+    .plan-wrap {
+      --plan-min-height: 280px;
+      min-width: 0;
+      min-height: var(--plan-min-height);
+      border-radius: 10px;
+      padding: 14px;
+      background: #f9fafb;
+      border: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .plan-wrap svg {
+      width: 100%;
+      height: 100%;
+      min-height: calc(var(--plan-min-height) - 28px);
+      max-height: 460px;
+      display: block;
+    }
+
+    .metric-grid {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .metric-card {
+      padding: 14px;
+      border-radius: 10px;
+      background: #f9fafb;
+      border: 1px solid var(--line);
+    }
+
+    .detail-list {
+      display: grid;
+      gap: 8px;
+      margin: 0;
+    }
+
+    .detail-item {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 8px 0;
+      border-bottom: 1px dashed rgba(29, 47, 44, 0.1);
+      font-size: 0.92rem;
+    }
+
+    .detail-item:last-child {
+      border-bottom: 0;
+      padding-bottom: 0;
+    }
+
+    .detail-item strong {
+      flex: 0 0 auto;
+      color: var(--muted);
+      font-size: 0.84rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .detail-item span {
+      text-align: right;
+    }
+
+    .detail-value-stack {
+      display: grid;
+      gap: 2px;
+      justify-items: end;
+      text-align: right;
+    }
+
+    .detail-subtext {
+      color: var(--muted);
+      font-size: 0.84rem;
+    }
+
+    .detail-item-stack {
+      display: grid;
+      gap: 4px;
+    }
+
+    .detail-item-stack span {
+      text-align: left;
+    }
+
+    .zone-editor {
+      display: grid;
+      gap: 12px;
+      padding: 14px;
+      border-radius: 10px;
+      background: #f9fafb;
+      border: 1px solid var(--line);
+    }
+
+    .zone-editor-head {
+      display: grid;
+      gap: 4px;
+    }
+
+    .zone-editor-head p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.86rem;
+    }
+
+    .zone-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .zone-card {
+      display: grid;
+      gap: 10px;
+      padding: 12px;
+      border-radius: 10px;
+      background: #fff;
+      border: 1px solid var(--line);
+    }
+
+    .zone-card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .zone-card-head strong {
+      font-size: 0.92rem;
+    }
+
+    .zone-grid {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .slider-field {
+      gap: 6px;
+    }
+
+    .slider-row {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: minmax(0, 1fr) 88px;
+      align-items: center;
+    }
+
+    .slider-row input[type="range"] {
+      width: 100%;
+      margin: 0;
+      accent-color: var(--accent);
+    }
+
+    .zone-inline {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .zone-inline .hint {
+      margin: 0;
+    }
+
+    .zone-results {
+      display: grid;
+      gap: 12px;
+    }
+
+    .zone-result-card {
+      display: grid;
+      gap: 12px;
+      padding: 14px;
+      border-radius: 10px;
+      background: #fff;
+      border: 1px solid var(--line);
+    }
+
+    .zone-result-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
+
+    .zone-result-head h4 {
+      margin: 0;
+      font-size: 1rem;
+    }
+
+    .zone-result-head p {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+
+    .coordinates {
+      margin: 0;
+      padding-left: 18px;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    .rules {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    }
+
+    .rule-card {
+      padding: 16px;
+      border-radius: 10px;
+      background: #fff;
+      border: 1px solid var(--line);
+    }
+
+    .rule-card h3 {
+      margin: 0 0 8px;
+      font-size: 0.98rem;
+    }
+
+    .rule-card p,
+    .rule-card ul {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .rule-card ul {
+      padding-left: 18px;
+    }
+
+    .models-shell {
+      display: grid;
+      gap: 12px;
+      min-width: 0;
+      padding: 16px;
+      border-radius: 10px;
+      background: #f9fafb;
+      border: 1px solid var(--line);
+    }
+
+    .models-grid {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .model-card {
+      padding: 14px;
+      border-radius: 10px;
+      background: #fff;
+      border: 1px solid var(--line);
+    }
+
+    .model-card strong {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 0.8rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .model-card h4 {
+      margin: 0 0 2px;
+      font-size: 1rem;
+    }
+
+    .model-card p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.86rem;
+    }
+
+    .model-stats {
+      display: grid;
+      gap: 6px;
+      margin-top: 10px;
+      font-size: 0.86rem;
+      color: var(--muted);
+    }
+
+    .model-stats span {
+      display: block;
+    }
+
+    details.models-details {
+      min-width: 0;
+      border-top: 1px dashed var(--line);
+      padding-top: 12px;
+    }
+
+    details.models-details summary {
+      cursor: pointer;
+      font-weight: 700;
+    }
+
+    .table-wrap {
+      display: block;
+      width: 100%;
+      max-width: 100%;
+      overflow-x: auto;
+      overflow-y: hidden;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior-x: contain;
+      touch-action: pan-x;
+      scrollbar-gutter: stable;
+      margin-top: 12px;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: #fff;
+    }
+
+    .table-wrap table {
+      width: max-content;
+      min-width: 100%;
+      border-collapse: collapse;
+      min-width: 980px;
+    }
+
+    .table-wrap th,
+    .table-wrap td {
+      padding: 10px 12px;
+      text-align: left;
+      border-bottom: 1px solid rgba(29, 47, 44, 0.08);
+      font-size: 0.86rem;
+    }
+
+    .table-wrap th {
+      font-size: 0.78rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted);
+      background: #f9fafb;
+    }
+
+    .table-wrap tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .catalog-head {
+      display: grid;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+
+    .catalog-toolbar {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      align-items: end;
+    }
+
+    .catalog-actions {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin: 2px 0 12px;
+    }
+
+    .catalog-summary {
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+
+    .catalog-summary strong {
+      color: var(--ink);
+    }
+
+    .catalog-table-wrap {
+      margin-top: 0;
+      max-height: min(58vh, 560px);
+      overflow: auto;
+    }
+
+    .catalog-table-wrap table {
+      min-width: 1220px;
+    }
+
+    .catalog-table-wrap th {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      background: #f9fafb;
+    }
+
+    .catalog-table-wrap tbody tr:nth-child(even) td {
+      background: #fcfcfd;
+    }
+
+    .catalog-table-wrap tbody tr:hover td {
+      background: #f4f7fb;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .footer-note {
+      margin-top: 14px;
+      color: var(--muted);
+      font-size: 0.86rem;
+    }
+
+    .site-footer {
+      margin-top: 18px;
+    }
+
+    .site-footer-card {
+      padding: 14px 16px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+
+    .site-footer-card strong {
+      color: var(--ink);
+    }
+
+    .site-footer-card a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    .site-footer-card a:hover {
+      text-decoration: underline;
+    }
+
+    .empty {
+      padding: 30px 22px;
+      text-align: center;
+      color: var(--muted);
+    }
+
+    @media (max-width: 980px) {
+      .layout,
+      .result-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .page {
+        padding-inline: 14px;
+      }
+
+      .field-grid,
+      .zone-grid,
+      .metric-grid,
+      .models-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media print {
+      :root {
+        --bg: #ffffff;
+      }
+
+      body {
+        background: #fff;
+      }
+
+      .page {
+        max-width: none;
+        margin: 0;
+        padding: 0;
+      }
+
+      .hero,
+      aside.panel,
+      #variability-note,
+      .catalog-panel,
+      .rules-panel,
+      .site-footer,
+      .report-actions {
+        display: none !important;
+      }
+
+      .layout,
+      .results-shell {
+        display: block;
+      }
+
+      .panel,
+      .summary-card,
+      .result-card,
+      .notice,
+      .model-card,
+      .zone-result-card,
+      .report-head,
+      .report-meta-card {
+        box-shadow: none;
+      }
+
+      .panel {
+        border: 0;
+        background: #fff;
+      }
+
+      .panel-body,
+      .result-card,
+      .models-shell {
+        padding-left: 0;
+        padding-right: 0;
+      }
+
+      .result-card,
+      .summary-card,
+      .notice,
+      .model-card,
+      .zone-result-card,
+      .report-head,
+      .report-meta-card,
+      .models-shell {
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
+
+      details.models-details {
+        display: none !important;
+      }
+
+      .table-wrap {
+        overflow: visible;
+      }
+
+      .table-wrap table {
+        min-width: 0;
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <section class="hero">
+      <div class="hero-card">
+        <span class="eyebrow">Référentiel BRASSE</span>
+        <h1>Outil de calepinage brasseurs d'air</h1>
+        <p>
+          Calcul d'implantations conformes au guide BRASSE de l'ADEME à partir des dimensions du local et de la hauteur sous
+          plafond, avec selection des diametres et modeles issus de BRASSE II. Plus d'info sur le projet <a href="https://librairie.ademe.fr/energies/6791-brasse.html">BRASSE</a>
+        </p>
+      </div>
+    </section>
+
+    <div class="layout">
+      <aside class="panel">
+        <div class="panel-body">
+          <h2 class="section-title">Données de la pièce à équiper</h2>
+          <p class="section-subtitle">
+            Le calcul "Recherche d'uniformité" vise l'uniformité dans toute la pièce, comme dans la procedure BRASSE. Le mode
+            "zones a couvrir" permet de definir des rectangles cibles à couvrir puis de laisser le moteur proposer une
+            trame de cellules et le nombre de brasseurs associé.
+          </p>
+
+          <form id="calculator-form">
+            <div class="field">
+              <label for="strategy">Strategie</label>
+              <select id="strategy" name="strategy">
+                <option value="uniformite">Recherche d'uniformite</option>
+                <option value="variabilite">Zones à couvrir</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="simulation-name">Nom de la simulation</label>
+              <input id="simulation-name" name="simulationName" type="text" maxlength="120" placeholder="Ex. Classe 1 école XXX commune XXX">
+            </div>
+
+            <div class="field-grid">
+              <div class="field">
+                <label for="length">Longueur de la piece (m)</label>
+                <input id="length" name="length" type="number" min="0.1" step="0.01" value="9">
+              </div>
+              <div class="field">
+                <label for="width">Largeur de la piece (m)</label>
+                <input id="width" name="width" type="number" min="0.1" step="0.01" value="5">
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="height">Hauteur sous plafond (m)</label>
+              <input id="height" name="height" type="number" min="0.1" step="0.01" value="2.5">
+            </div>
+
+            <section id="zones-config" class="zone-editor hidden">
+              <div class="zone-editor-head">
+                <strong>Zones à couvrir</strong>
+                <p>
+                  Chaque zone est décrite par son rectangle cible. Le moteur cherche ensuite une trame reguliere et
+                  active seulement les cellules nécessaires pour couvrir ces rectangles.
+                </p>
+              </div>
+              <div id="zones-list" class="zone-list"></div>
+              <div class="zone-inline">
+                <button class="secondary" type="button" id="add-zone-button">Ajouter une zone</button>
+                <p class="hint">Coordonnées exprimées depuis le coin bas-gauche du local.</p>
+              </div>
+            </section>
+
+            <div class="stack">
+              <span class="hint">Montages étudiés</span>
+              <div class="check-list">
+                <label class="check">
+                  <input id="allow-standard" type="checkbox" checked>
+                  <span>Standard (distance plafond-pales superieure a <code>0,35 D</code>).</span>
+                </label>
+                <label class="check">
+                  <input id="allow-low" type="checkbox" checked>
+                  <span>Low-profile (jusqu'à <code>0,25 D</code>, avec baisse d'environ 15 % de la vitesse d'air).</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="button-row">
+              <button class="primary" type="submit">Calculer le calepinage</button>
+              <button class="secondary" type="button" id="reset-button">Reinitialiser</button>
+            </div>
+          </form>
+        </div>
+      </aside>
+
+      <main class="results-shell">
+        <section id="variability-note" class="panel hidden">
+          <div class="panel-body">
+            <h2 class="section-title">Cas "zones à couvrir"</h2>
+            <div class="notice warning">
+              <strong>Le guide BRASSE ne donne pas de calepinage geometrique unique pour ce cas.</strong><br>
+              Cette version traite les rectangles comme des zones à couvrir, puis explore des trames regulieres
+              ancrées au local. Les cellules qui intersectent les zones sont activees, ensuite les contraintes BRASSE
+              de FCC, de murs, d'espacement, de montage et de hauteur sont vérifiées avant de comparer les modèles
+              BRASSE II.
+            </div>
+          </div>
+        </section>
+
+        <section class="panel results-panel">
+          <div class="panel-body">
+            <div id="empty-state" class="empty">
+              Lancez un calcul pour obtenir les configurations conformes au guide BRASSE.
+            </div>
+
+            <div id="results-content" class="hidden">
+              <div class="report-head">
+                <div>
+                  <p class="report-kicker">Rapport de simulation</p>
+                  <h2 id="report-title" class="report-title">Simulation sans nom</h2>
+                  <p id="report-context" class="report-context">Renseignez le local et lancez un calcul.</p>
+                </div>
+                <div class="report-actions">
+                  <button class="secondary" type="button" id="export-pdf-button" disabled>Exporter en PDF</button>
+                </div>
+              </div>
+
+              <div id="report-meta" class="report-meta"></div>
+
+              <div id="summary-grid" class="summary-grid"></div>
+              <div id="status-note"></div>
+              <div id="highlights" class="summary-grid"></div>
+
+              <div id="results-list" class="stack"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel catalog-panel">
+          <div class="panel-body">
+            <div class="catalog-head">
+              <h2 class="section-title">Catalogue BRASSE II</h2>
+              <p class="section-subtitle" style="margin-bottom:0;">
+                Base de reference complete des modeles embarques. Les cartes de resultat continuent d'afficher
+                uniquement les modeles compatibles avec la simulation, tandis que ce tableau sert a consulter toute
+                la base BRASSE II.
+              </p>
+            </div>
+
+            <div class="catalog-toolbar">
+              <div class="field">
+                <label for="catalog-search">Recherche</label>
+                <input id="catalog-search" type="search" placeholder="Ref., marque, modele">
+              </div>
+              <div class="field">
+                <label for="catalog-brand">Marque</label>
+                <select id="catalog-brand"></select>
+              </div>
+              <div class="field">
+                <label for="catalog-diameter">Diametre</label>
+                <select id="catalog-diameter"></select>
+              </div>
+              <div class="field">
+                <label for="catalog-motor">Moteur</label>
+                <select id="catalog-motor"></select>
+              </div>
+              <div class="field">
+                <label for="catalog-fixation">Fixation</label>
+                <select id="catalog-fixation"></select>
+              </div>
+              <div class="field">
+                <label for="catalog-sort">Tri</label>
+                <select id="catalog-sort">
+                  <option value="diameter-asc">Diametre croissant</option>
+                  <option value="diameter-desc">Diametre decroissant</option>
+                  <option value="comfort">CE dir debout max</option>
+                  <option value="efficiency">CFE dir debout max</option>
+                  <option value="acoustics">LwA croissant</option>
+                  <option value="power">Puissance croissante</option>
+                  <option value="brand">Marque / modele</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="catalog-actions">
+              <div id="catalog-summary" class="catalog-summary"></div>
+              <button class="secondary" type="button" id="catalog-reset-button">Reinitialiser les filtres</button>
+            </div>
+
+            <div id="catalog-table-host"></div>
+          </div>
+        </section>
+
+        <section class="panel rules-panel">
+          <div class="panel-body">
+            <h2 class="section-title">Rappels BRASSE repris dans l'outil</h2>
+            <div class="rules">
+              <article class="rule-card">
+                <h3>Decoupage et symetrie</h3>
+                <p>
+                  Les brasseurs sont centres dans la piece ou dans des cellules egales. L'outil explore des maillages
+                  reguliers pour conserver cette symetrie.
+                </p>
+              </article>
+
+              <article class="rule-card">
+                <h3>Facteur de forme</h3>
+                <p>
+                  Le facteur de forme est calcule comme <code>max(longueur, largeur) / min(longueur, largeur)</code>.
+                  Plus il se rapproche de <code>1</code>, plus l'uniformite est favorable.
+                </p>
+              </article>
+
+              <article class="rule-card">
+                <h3>Facteur de couverture</h3>
+                <p>
+                  Le FCC est maintenu entre <code>0,2</code> et <code>0,4</code>. Dans cette interface, il est calcule
+                  comme <code>D / racine(surface de cellule)</code>, formule reconstituee a partir de l'exemple chiffre
+                  du guide.
+                </p>
+              </article>
+
+              <article class="rule-card">
+                <h3>Distances de pose</h3>
+                <ul>
+                  <li>Centre vers mur superieur au diametre.</li>
+                  <li>Centre a centre entre deux brasseurs adjacents superieur a <code>2,5 D</code>.</li>
+                  <li>Plafond vers plan des pales superieur a <code>0,35 D</code> en standard, possible jusqu'a <code>0,25 D</code> en low-profile.</li>
+                </ul>
+              </article>
+
+              <article class="rule-card">
+                <h3>Hauteur sous pales</h3>
+                <ul>
+                  <li>Petits brasseurs (<code>D &lt; 2,13 m</code>) : securite au-dessus de <code>2,13 m</code>, recommandation d'aisance au-dessus de <code>1,4 D</code>, et vitesse optimale sous <code>2 D</code>.</li>
+                  <li>Grands brasseurs (<code>D &gt;= 2,13 m</code>) : securite au-dessus de <code>3,05 m</code> et plage optimale entre <code>0,8 D</code> et <code>2 D</code>.</li>
+                </ul>
+              </article>
+
+              <article class="rule-card">
+                <h3>Base BRASSE II</h3>
+                <p style="margin-top:8px;">
+                  Les modeles de la base BRASSE II sont compares avec les indicateurs BRASSE d'effet rafraichissant, d'efficacite et de
+                  puissance acoustique.
+                </p>
+              </article>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <footer class="site-footer">
+      <div class="site-footer-card">
+        Fait par Nathan Chateau,
+        <a href="mailto:chateaunathan@proton.me">chateaunathan@proton.me</a>,
+      </div>
+    </footer>
+  </div>
+
+  <script src="./brasse2-data.js"></script>
+  <script>
+    const EPS = 1e-9;
+    const SMALL_FAN_LIMIT = 2.13;
+    const SMALL_SAFETY_HEIGHT = 2.13;
+    const LARGE_SAFETY_HEIGHT = 3.05;
+    const MAX_GRID_FANS = 36;
+
+    const MOUNT_MODES = [
+      {
+        id: "standard",
+        label: "Montage standard",
+        factor: 0.35,
+        penaltyText: "Pas de reduction explicite dans le guide.",
+        severity: "ok"
+      },
+      {
+        id: "low-profile",
+        label: "Montage low-profile",
+        factor: 0.25,
+        penaltyText: "Reduction de vitesse d'air d'environ 15 % selon le guide.",
+        severity: "warn"
+      }
+    ];
+
+    const FLUSH_MODE = {
+      id: "flush",
+      label: "Montage flush",
+      factor: 0.15,
+      penaltyText: "Perte de performance de plus de 40 % ; le guide demande de l'eviter au maximum.",
+      severity: "alert"
+    };
+
+    const CATALOG_SORTS = {
+      "diameter-asc": (a, b) => (a.diameterCm - b.diameterCm) || compareCatalogIdentity(a, b),
+      "diameter-desc": (a, b) => (b.diameterCm - a.diameterCm) || compareCatalogIdentity(a, b),
+      comfort: (a, b) => compareComfort(a, b) || compareCatalogIdentity(a, b),
+      efficiency: (a, b) => compareEfficiency(a, b) || compareCatalogIdentity(a, b),
+      acoustics: (a, b) => compareAcoustics(a, b) || compareCatalogIdentity(a, b),
+      power: (a, b) => (a.powerMaxW - b.powerMaxW) || compareCatalogIdentity(a, b),
+      brand: (a, b) => compareCatalogIdentity(a, b)
+    };
+
+    const form = document.getElementById("calculator-form");
+    const strategyInput = document.getElementById("strategy");
+    const simulationNameInput = document.getElementById("simulation-name");
+    const lengthInput = document.getElementById("length");
+    const widthInput = document.getElementById("width");
+    const heightInput = document.getElementById("height");
+    const zonesConfig = document.getElementById("zones-config");
+    const zonesList = document.getElementById("zones-list");
+    const addZoneButton = document.getElementById("add-zone-button");
+    const allowStandardInput = document.getElementById("allow-standard");
+    const allowLowInput = document.getElementById("allow-low");
+    const resetButton = document.getElementById("reset-button");
+
+    const variabilityNote = document.getElementById("variability-note");
+    const emptyState = document.getElementById("empty-state");
+    const resultsContent = document.getElementById("results-content");
+    const summaryGrid = document.getElementById("summary-grid");
+    const highlights = document.getElementById("highlights");
+    const statusNote = document.getElementById("status-note");
+    const resultsList = document.getElementById("results-list");
+    const reportTitle = document.getElementById("report-title");
+    const reportContext = document.getElementById("report-context");
+    const reportMeta = document.getElementById("report-meta");
+    const exportPdfButton = document.getElementById("export-pdf-button");
+    const catalogSearchInput = document.getElementById("catalog-search");
+    const catalogBrandInput = document.getElementById("catalog-brand");
+    const catalogDiameterInput = document.getElementById("catalog-diameter");
+    const catalogMotorInput = document.getElementById("catalog-motor");
+    const catalogFixationInput = document.getElementById("catalog-fixation");
+    const catalogSortInput = document.getElementById("catalog-sort");
+    const catalogResetButton = document.getElementById("catalog-reset-button");
+    const catalogSummary = document.getElementById("catalog-summary");
+    const catalogTableHost = document.getElementById("catalog-table-host");
+
+    const brasse2Models = window.BRASSE2_MODELS || [];
+    const REAL_DIAMETERS = [...new Set(
+      brasse2Models
+        .map((model) => Number(model.diameterCm) / 100)
+        .filter((value) => Number.isFinite(value) && value > 0)
+    )].sort((a, b) => a - b);
+    let nextZoneId = 1;
+    let variabilityZones = [];
+    let latestReportState = null;
+
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      render();
+    });
+
+    strategyInput.addEventListener("change", () => {
+      toggleStrategyUI();
+      render();
+    });
+
+    resetButton.addEventListener("click", () => {
+      lengthInput.value = "9";
+      widthInput.value = "5";
+      heightInput.value = "2.5";
+      simulationNameInput.value = "";
+      strategyInput.value = "uniformite";
+      allowStandardInput.checked = true;
+      allowLowInput.checked = true;
+      variabilityZones = [];
+      toggleStrategyUI();
+      renderZonesEditor();
+      render();
+    });
+
+    addZoneButton.addEventListener("click", () => {
+      variabilityZones.push(createDefaultZoneDraft());
+      renderZonesEditor();
+      if (strategyInput.value === "variabilite") {
+        render();
+      }
+    });
+
+    simulationNameInput.addEventListener("input", () => {
+      refreshReportHeader({
+        strategy: strategyInput.value,
+        room: {
+          length: parseNumber(lengthInput),
+          width: parseNumber(widthInput),
+          height: parseNumber(heightInput)
+        }
+      });
+    });
+
+    exportPdfButton.addEventListener("click", () => {
+      exportPdfReport();
+    });
+
+    catalogSearchInput.addEventListener("input", () => {
+      renderCatalog();
+    });
+
+    [catalogBrandInput, catalogDiameterInput, catalogMotorInput, catalogFixationInput, catalogSortInput].forEach((input) => {
+      input.addEventListener("change", () => {
+        renderCatalog();
+      });
+    });
+
+    catalogResetButton.addEventListener("click", () => {
+      resetCatalogFilters();
+      renderCatalog();
+    });
+
+    zonesList.addEventListener("input", (event) => {
+      const target = event.target;
+      if (!target || !target.dataset) {
+        return;
+      }
+      if (target.type !== "range") {
+        return;
+      }
+      const zoneId = Number(target.dataset.zoneId);
+      const field = target.dataset.field;
+      if (!Number.isFinite(zoneId) || !field) {
+        return;
+      }
+      updateZoneDraft(zoneId, field, target.value);
+      syncZoneCard(zoneId);
+    });
+
+    zonesList.addEventListener("change", (event) => {
+      const target = event.target;
+      if (!target || !target.dataset) {
+        return;
+      }
+      const zoneId = Number(target.dataset.zoneId);
+      const field = target.dataset.field;
+      if (!Number.isFinite(zoneId) || !field) {
+        return;
+      }
+      updateZoneDraft(zoneId, field, target.value);
+      syncZoneCard(zoneId);
+      if (strategyInput.value === "variabilite") {
+        render();
+      }
+    });
+
+    zonesList.addEventListener("click", (event) => {
+      const removeButton = event.target && typeof event.target.closest === "function"
+        ? event.target.closest("[data-remove-zone]")
+        : null;
+      if (!removeButton) {
+        return;
+      }
+      const zoneId = Number(removeButton.dataset.removeZone);
+      if (!Number.isFinite(zoneId) || variabilityZones.length <= 1) {
+        return;
+      }
+      variabilityZones = variabilityZones.filter((zone) => zone.id !== zoneId);
+      renderZonesEditor();
+      if (strategyInput.value === "variabilite") {
+        render();
+      }
+    });
+
+    [lengthInput, widthInput].forEach((input) => {
+      input.addEventListener("change", () => {
+        if (strategyInput.value !== "variabilite") {
+          return;
+        }
+        normalizeAllZoneDrafts();
+        renderZonesEditor();
+        render();
+      });
+    });
+
+    function formatInputValue(value) {
+      if (!Number.isFinite(value)) {
+        return "";
+      }
+      return String(Math.round(value * 100) / 100).replace(/\.0+$/, "").replace(/\.$/, "");
+    }
+
+    function getCurrentRoomDraft() {
+      const length = parseNumber(lengthInput);
+      const width = parseNumber(widthInput);
+
+      return {
+        length: Number.isFinite(length) && length > 0 ? length : 9,
+        width: Number.isFinite(width) && width > 0 ? width : 5
+      };
+    }
+
+    function createDefaultZoneDraft() {
+      const room = getCurrentRoomDraft();
+      const zoneLength = Math.min(room.length, Math.max(1.5, room.length / 3));
+      const zoneWidth = Math.min(room.width, Math.max(1.5, room.width / 3));
+      const offsetIndex = variabilityZones.length;
+      const offsetX = ((offsetIndex % 3) - 1) * Math.min(0.9, zoneLength * 0.25);
+      const offsetY = (offsetIndex % 2 === 0 ? 1 : -1) * Math.min(0.6, zoneWidth * 0.2);
+      const centerX = Math.min(room.length - zoneLength / 2, Math.max(zoneLength / 2, room.length / 2 + offsetX));
+      const centerY = Math.min(room.width - zoneWidth / 2, Math.max(zoneWidth / 2, room.width / 2 + offsetY));
+
+      return {
+        id: nextZoneId++,
+        centerX,
+        centerY,
+        length: zoneLength,
+        width: zoneWidth
+      };
+    }
+
+    function ensureVariabilityZones() {
+      if (variabilityZones.length === 0) {
+        variabilityZones = [createDefaultZoneDraft()];
+      }
+    }
+
+    function updateZoneDraft(zoneId, field, value) {
+      variabilityZones = variabilityZones.map((zone) => (
+        zone.id === zoneId ? normalizeZoneDraft({ ...zone, [field]: value }, getCurrentRoomDraft()) : zone
+      ));
+    }
+
+    function clamp(value, min, max) {
+      return Math.min(max, Math.max(min, value));
+    }
+
+    function parseZoneValue(value, fallback) {
+      const parsed = Number.parseFloat(String(value).replace(",", "."));
+      return Number.isFinite(parsed) ? parsed : fallback;
+    }
+
+    function normalizeZoneDraft(zone, room) {
+      const safeRoom = {
+        length: Math.max(room.length, 0.1),
+        width: Math.max(room.width, 0.1)
+      };
+      let centerX = clamp(parseZoneValue(zone.centerX, safeRoom.length / 2), 0, safeRoom.length);
+      let centerY = clamp(parseZoneValue(zone.centerY, safeRoom.width / 2), 0, safeRoom.width);
+      let length = Math.max(0.1, parseZoneValue(zone.length, Math.min(2, safeRoom.length)));
+      let width = Math.max(0.1, parseZoneValue(zone.width, Math.min(2, safeRoom.width)));
+
+      const maxLengthFromCenter = Math.max(0.1, 2 * Math.min(centerX, safeRoom.length - centerX));
+      const maxWidthFromCenter = Math.max(0.1, 2 * Math.min(centerY, safeRoom.width - centerY));
+
+      length = clamp(length, 0.1, maxLengthFromCenter);
+      width = clamp(width, 0.1, maxWidthFromCenter);
+      centerX = clamp(centerX, length / 2, safeRoom.length - length / 2);
+      centerY = clamp(centerY, width / 2, safeRoom.width - width / 2);
+
+      return {
+        ...zone,
+        centerX,
+        centerY,
+        length,
+        width
+      };
+    }
+
+    function getZoneBounds(zone, room) {
+      return {
+        centerX: {
+          min: zone.length / 2,
+          max: room.length - zone.length / 2
+        },
+        centerY: {
+          min: zone.width / 2,
+          max: room.width - zone.width / 2
+        },
+        length: {
+          min: 0.1,
+          max: Math.max(0.1, 2 * Math.min(zone.centerX, room.length - zone.centerX))
+        },
+        width: {
+          min: 0.1,
+          max: Math.max(0.1, 2 * Math.min(zone.centerY, room.width - zone.centerY))
+        }
+      };
+    }
+
+    function normalizeAllZoneDrafts() {
+      const room = getCurrentRoomDraft();
+      variabilityZones = variabilityZones.map((zone) => normalizeZoneDraft(zone, room));
+    }
+
+    function syncZoneCard(zoneId) {
+      const room = getCurrentRoomDraft();
+      const zone = variabilityZones.find((item) => item.id === zoneId);
+      if (!zone || typeof zonesList.querySelectorAll !== "function") {
+        return;
+      }
+      const bounds = getZoneBounds(zone, room);
+      const inputs = zonesList.querySelectorAll(`[data-zone-id="${zoneId}"]`);
+
+      inputs.forEach((input) => {
+        const field = input.dataset.field;
+        if (!field || !bounds[field]) {
+          return;
+        }
+        input.min = formatInputValue(bounds[field].min);
+        input.max = formatInputValue(bounds[field].max);
+        input.value = formatInputValue(zone[field]);
+      });
+    }
+
+    function renderZonesEditor() {
+      ensureVariabilityZones();
+      normalizeAllZoneDrafts();
+      const room = getCurrentRoomDraft();
+      zonesList.innerHTML = variabilityZones.map((zone, index) => {
+        const bounds = getZoneBounds(zone, room);
+        const renderSliderField = (label, field, min, max) => `
+          <div class="field slider-field">
+            <label>${label}</label>
+            <div class="slider-row">
+              <input
+                type="range"
+                min="${formatInputValue(min)}"
+                max="${formatInputValue(max)}"
+                step="0.01"
+                value="${formatInputValue(zone[field])}"
+                data-zone-id="${zone.id}"
+                data-field="${field}"
+              >
+              <input
+                type="number"
+                min="${formatInputValue(min)}"
+                max="${formatInputValue(max)}"
+                step="0.01"
+                value="${formatInputValue(zone[field])}"
+                data-zone-id="${zone.id}"
+                data-field="${field}"
+              >
+            </div>
+          </div>
+        `;
+
+        return `
+        <article class="zone-card">
+          <div class="zone-card-head">
+            <strong>Zone ${index + 1}</strong>
+            <button
+              class="secondary"
+              type="button"
+              data-remove-zone="${zone.id}"
+              ${variabilityZones.length <= 1 ? "disabled" : ""}
+            >
+              Supprimer
+            </button>
+          </div>
+          <div class="zone-grid">
+            ${renderSliderField("Centre X (m)", "centerX", bounds.centerX.min, bounds.centerX.max)}
+            ${renderSliderField("Centre Y (m)", "centerY", bounds.centerY.min, bounds.centerY.max)}
+            ${renderSliderField("Longueur cible (m)", "length", bounds.length.min, bounds.length.max)}
+            ${renderSliderField("Largeur cible (m)", "width", bounds.width.min, bounds.width.max)}
+          </div>
+        </article>
+      `;
+      }).join("");
+    }
+
+    function parseNumber(input) {
+      const normalized = String(input.value || "").replace(",", ".");
+      const value = Number.parseFloat(normalized);
+      return Number.isFinite(value) ? value : NaN;
+    }
+
+    function formatNumber(value, digits = 2) {
+      return value.toLocaleString("fr-FR", {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: digits
+      });
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll("\"", "&quot;")
+        .replaceAll("'", "&#39;");
+    }
+
+    function formatMeters(value, digits = 2) {
+      return `${formatNumber(value, digits)} m`;
+    }
+
+    function formatDiameterCm(value) {
+      return `${Math.round(value * 100)}`;
+    }
+
+    function formatDiameterCmList(values) {
+      return values.map((value) => formatDiameterCm(typeof value === "number" ? value : value.diameter)).join(", ");
+    }
+
+    function formatSquareMeters(value, digits = 2) {
+      return `${formatNumber(value, digits)} m²`;
+    }
+
+    function formatFactor(value, digits = 2) {
+      return formatNumber(value, digits);
+    }
+
+    function formatTemp(value, digits = 2) {
+      return `${formatNumber(value, digits)} °C`;
+    }
+
+    function formatDb(value, digits = 1) {
+      return `${formatNumber(value, digits)} dBA`;
+    }
+
+    function formatWatts(value, digits = 0) {
+      return `${formatNumber(value, digits)} W`;
+    }
+
+    function formatDateTime(value = new Date()) {
+      return new Intl.DateTimeFormat("fr-FR", {
+        dateStyle: "medium",
+        timeStyle: "short"
+      }).format(value);
+    }
+
+    function formatDiameterList(values) {
+      return values.map((diameter) => formatMeters(diameter)).join(", ");
+    }
+
+    function getSimulationName() {
+      const value = String(simulationNameInput.value || "").trim();
+      return value || "Simulation sans nom";
+    }
+
+    function getStrategyLabel(strategy) {
+      return strategy === "variabilite" ? "Zones a couvrir" : "Recherche d'uniformite";
+    }
+
+    function getSelectedModesLabel() {
+      const labels = getSelectedModes().map((mode) => mode.label);
+      return labels.length > 0 ? labels.join(" + ") : "Aucun";
+    }
+
+    function compareCatalogIdentity(a, b) {
+      const brandDiff = String(a.brand).localeCompare(String(b.brand), "fr", { sensitivity: "base" });
+      if (brandDiff !== 0) {
+        return brandDiff;
+      }
+      const modelDiff = String(a.model).localeCompare(String(b.model), "fr", { sensitivity: "base" });
+      if (modelDiff !== 0) {
+        return modelDiff;
+      }
+      return String(a.id).localeCompare(String(b.id), "fr", { sensitivity: "base", numeric: true });
+    }
+
+    function normalizeCatalogSearch(value) {
+      return String(value || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .trim();
+    }
+
+    function setCatalogSelectOptions(select, options, emptyLabel, formatter = (value) => value) {
+      select.innerHTML = [
+        `<option value="">${escapeHtml(emptyLabel)}</option>`,
+        ...options.map((value) => `<option value="${escapeHtml(String(value))}">${escapeHtml(formatter(value))}</option>`)
+      ].join("");
+    }
+
+    function initializeCatalogFilters() {
+      const brands = [...new Set(brasse2Models.map((model) => model.brand))].sort((a, b) =>
+        String(a).localeCompare(String(b), "fr", { sensitivity: "base" })
+      );
+      const diameters = [...new Set(brasse2Models.map((model) => model.diameterCm))].sort((a, b) => a - b);
+      const motors = [...new Set(brasse2Models.map((model) => model.motor))].sort();
+      const fixations = [...new Set(brasse2Models.map((model) => model.fixation))].sort((a, b) =>
+        String(a).localeCompare(String(b), "fr", { sensitivity: "base" })
+      );
+
+      setCatalogSelectOptions(catalogBrandInput, brands, "Toutes les marques");
+      setCatalogSelectOptions(catalogDiameterInput, diameters, "Tous les diametres", (value) => `${value} cm`);
+      setCatalogSelectOptions(catalogMotorInput, motors, "Tous les moteurs");
+      setCatalogSelectOptions(catalogFixationInput, fixations, "Toutes les fixations");
+      catalogSortInput.value = "diameter-asc";
+    }
+
+    function resetCatalogFilters() {
+      catalogSearchInput.value = "";
+      catalogBrandInput.value = "";
+      catalogDiameterInput.value = "";
+      catalogMotorInput.value = "";
+      catalogFixationInput.value = "";
+      catalogSortInput.value = "diameter-asc";
+    }
+
+    function getCatalogFilterState() {
+      const searchText = String(catalogSearchInput.value || "").trim();
+      return {
+        search: normalizeCatalogSearch(searchText),
+        searchText,
+        brand: catalogBrandInput.value,
+        diameterCm: Number.parseInt(catalogDiameterInput.value, 10),
+        motor: catalogMotorInput.value,
+        fixation: catalogFixationInput.value,
+        sort: catalogSortInput.value || "diameter-asc"
+      };
+    }
+
+    function getCatalogActiveFilterLabels(filters) {
+      const labels = [];
+      if (filters.searchText) {
+        labels.push(`recherche: ${filters.searchText}`);
+      }
+      if (filters.brand) {
+        labels.push(`marque: ${filters.brand}`);
+      }
+      if (Number.isFinite(filters.diameterCm)) {
+        labels.push(`diametre: ${filters.diameterCm} cm`);
+      }
+      if (filters.motor) {
+        labels.push(`moteur: ${filters.motor}`);
+      }
+      if (filters.fixation) {
+        labels.push(`fixation: ${filters.fixation}`);
+      }
+      return labels;
+    }
+
+    function getFilteredCatalogModels() {
+      const filters = getCatalogFilterState();
+      const searchFields = (model) => [
+        model.id,
+        model.brand,
+        model.model,
+        model.fixation,
+        model.motor,
+        `${model.diameterCm}`
+      ].map((value) => normalizeCatalogSearch(value));
+
+      const filtered = brasse2Models.filter((model) => {
+        if (filters.search && !searchFields(model).some((value) => value.includes(filters.search))) {
+          return false;
+        }
+        if (filters.brand && model.brand !== filters.brand) {
+          return false;
+        }
+        if (Number.isFinite(filters.diameterCm) && model.diameterCm !== filters.diameterCm) {
+          return false;
+        }
+        if (filters.motor && model.motor !== filters.motor) {
+          return false;
+        }
+        if (filters.fixation && model.fixation !== filters.fixation) {
+          return false;
+        }
+        return true;
+      });
+
+      const comparator = CATALOG_SORTS[filters.sort] || CATALOG_SORTS["diameter-asc"];
+      return {
+        filters,
+        models: [...filtered].sort(comparator)
+      };
+    }
+
+    function renderCatalogTable(models) {
+      if (models.length === 0) {
+        return `
+          <div class="notice warning">
+            <strong>Aucun modele ne correspond aux filtres actifs.</strong>
+            Ajustez les criteres ou reinitialisez les filtres pour retrouver la base complete.
+          </div>
+        `;
+      }
+
+      return `
+        <div class="table-wrap catalog-table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Ref.</th>
+                <th>Marque</th>
+                <th>Modele</th>
+                <th>Diam.</th>
+                <th>Moteur</th>
+                <th>Fixation</th>
+                <th>Plafond/BA</th>
+                <th>H test</th>
+                <th>CE dir debout</th>
+                <th>CFE dir debout</th>
+                <th>CE moyen</th>
+                <th>LwA</th>
+                <th>P max</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${models.map((model) => `
+                <tr>
+                  <td>${escapeHtml(model.id)}</td>
+                  <td>${escapeHtml(model.brand)}</td>
+                  <td>${escapeHtml(model.model)}</td>
+                  <td>${escapeHtml(String(model.diameterCm))}</td>
+                  <td>${escapeHtml(model.motor)}</td>
+                  <td>${escapeHtml(model.fixation)}</td>
+                  <td>${formatNumber(model.ceilingDistanceCm, 1)} cm</td>
+                  <td>${formatNumber(model.testHeightCm, 1)} cm</td>
+                  <td>${formatTemp(model.ceDirDeboutMax)}</td>
+                  <td>${formatNumber(model.cfeDirDeboutMax, 4)} °C/W</td>
+                  <td>${formatTemp(model.ceAvgMax)}</td>
+                  <td>${formatDb(model.lwaMaxDbA)}</td>
+                  <td>${formatWatts(model.powerMaxW, 0)}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    function renderCatalog() {
+      const { filters, models } = getFilteredCatalogModels();
+      const activeFilters = getCatalogActiveFilterLabels(filters);
+
+      catalogSummary.innerHTML = `
+        <strong>${models.length}</strong> modele${models.length > 1 ? "s" : ""} affiche${models.length > 1 ? "s" : ""}
+        sur ${brasse2Models.length}
+        ${activeFilters.length > 0 ? ` • Filtres actifs : ${escapeHtml(activeFilters.join(" • "))}` : ""}
+      `;
+      catalogTableHost.innerHTML = renderCatalogTable(models);
+    }
+
+    function refreshReportHeader({ strategy, room, recommendation = "", generatedAt = new Date() }) {
+      reportTitle.textContent = getSimulationName();
+      reportContext.textContent = `${getStrategyLabel(strategy)}${recommendation ? ` • ${recommendation}` : ""}`;
+
+      const metaItems = [];
+      metaItems.push(["Strategie", getStrategyLabel(strategy)]);
+      metaItems.push(["Montages etudies", getSelectedModesLabel()]);
+      metaItems.push(["Genere le", formatDateTime(generatedAt)]);
+
+      reportMeta.innerHTML = metaItems.map(([label, value]) => `
+        <article class="report-meta-card">
+          <strong>${escapeHtml(label)}</strong>
+          <span>${escapeHtml(value)}</span>
+        </article>
+      `).join("");
+    }
+
+    function setExportAvailability(enabled) {
+      exportPdfButton.disabled = !enabled;
+    }
+
+    function getCandidateWarnings(candidate) {
+      const warnings = [];
+      if (!candidate.recommendedSmallHeightMet && candidate.fanClass === "small") {
+        warnings.push("La recommandation d'aisance > 1,4 D n'est pas atteinte.");
+      }
+      if (candidate.mountMode.id === "low-profile") {
+        warnings.push(candidate.mountMode.penaltyText);
+      }
+      return warnings;
+    }
+
+    function getVariabilityWarnings(design) {
+      const warnings = [];
+      if (!design.recommendedSmallHeightMet && design.fanClass === "small") {
+        warnings.push("La recommandation d'aisance > 1,4 D n'est pas atteinte.");
+      }
+      if (design.mountMode.id === "low-profile") {
+        warnings.push(design.mountMode.penaltyText);
+      }
+      if (design.selectedCentersOutsideCount > 0) {
+        warnings.push(`${design.selectedCentersOutsideCount} centre${design.selectedCentersOutsideCount > 1 ? "s" : ""} de cellule reste${design.selectedCentersOutsideCount > 1 ? "nt" : ""} hors des rectangles cibles.`);
+      }
+      return warnings;
+    }
+
+    function getReportModelHighlights(candidate) {
+      const models = getBrasse2ModelsForCandidate(candidate);
+      const picks = buildModelPicks(models);
+      return picks.map((pick) => ({
+        title: pick.title,
+        model: pick.model
+      }));
+    }
+
+    function renderReportWarningList(items) {
+      if (!items || items.length === 0) {
+        return "";
+      }
+
+      return `
+        <div class="report-note report-note-warning">
+          <strong>Points d'attention</strong>
+          <ul>
+            ${items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
+          </ul>
+        </div>
+      `;
+    }
+
+    function renderReportModelHighlights(candidate) {
+      const highlights = getReportModelHighlights(candidate);
+      if (highlights.length === 0) {
+        return `
+          <div class="report-note">
+            <strong>Modeles BRASSE II</strong>
+            <p>Aucun modele compatible dans la base embarquee sur les diametres admissibles.</p>
+          </div>
+        `;
+      }
+
+      return `
+        <section class="report-section">
+          <h4>Selection BRASSE II</h4>
+          <table class="report-table compact">
+            <thead>
+              <tr>
+                <th>Lecture</th>
+                <th>Marque / modele</th>
+                <th>Diam.</th>
+                <th>FCC</th>
+                <th>CE dir.</th>
+                <th>CFE dir.</th>
+                <th>LwA</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${highlights.map((entry) => `
+                <tr>
+                  <td>${escapeHtml(entry.title)}</td>
+                  <td>${escapeHtml(`${entry.model.brand} ${entry.model.model}`)}</td>
+                  <td>${escapeHtml(String(entry.model.diameterCm))}</td>
+                  <td>${escapeHtml(Number.isFinite(entry.model.compatibleOption.coverageFactor) ? formatFactor(entry.model.compatibleOption.coverageFactor) : "—")}</td>
+                  <td>${escapeHtml(formatTemp(entry.model.ceDirDeboutMax))}</td>
+                  <td>${escapeHtml(`${formatNumber(entry.model.cfeDirDeboutMax, 4)} °C/W`)}</td>
+                  <td>${escapeHtml(formatDb(entry.model.lwaMaxDbA))}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        </section>
+      `;
+    }
+
+    function renderReportMetricGrid(items) {
+      return `
+        <div class="report-metrics">
+          ${items.map(([label, value]) => `
+            <article class="report-metric">
+              <strong>${escapeHtml(label)}</strong>
+              <span>${escapeHtml(value)}</span>
+            </article>
+          `).join("")}
+        </div>
+      `;
+    }
+
+    function renderUniformityReportOptions(candidates) {
+      return candidates.map((candidate, index) => `
+        <section class="report-option">
+          <div class="report-option-head">
+            <div>
+              <h3>Option ${index + 1}</h3>
+              <p>${escapeHtml(`${candidate.fanCount} brasseur${candidate.fanCount > 1 ? "s" : ""} sur ${candidate.nx} × ${candidate.ny} cellules - ${candidate.mountMode.label}`)}</p>
+            </div>
+          </div>
+
+          ${renderReportMetricGrid([
+            ["Diametre retenu", formatMeters(candidate.diameter)],
+            ["Diametre theorique max", formatMeters(candidate.theoreticalMaxDiameter)],
+            ["FCC reel", formatFactor(candidate.coverageFactor)],
+            ["Cellule", `${formatMeters(candidate.cellLength)} × ${formatMeters(candidate.cellWidth)}`],
+            ["Mur limitant", formatMeters(candidate.wallClearance)],
+            ["Entraxe mini", candidate.interFanSpacing ? formatMeters(candidate.interFanSpacing) : "Non applicable"]
+          ])}
+
+          <div class="report-plan-block">
+            <div class="report-plan">${svgForCandidate(candidate)}</div>
+            <div class="report-side">
+              <table class="report-table">
+                <tbody>
+                  <tr>
+                    <th>Montage</th>
+                    <td>${escapeHtml(`${candidate.mountMode.label} (${formatMeters(candidate.mountDistance)})`)}</td>
+                  </tr>
+                  <tr>
+                    <th>Hauteur sous pales</th>
+                    <td>${escapeHtml(formatMeters(candidate.bladeHeight))}</td>
+                  </tr>
+                  <tr>
+                    <th>Facteur de forme</th>
+                    <td>${escapeHtml(formatFactor(candidate.formFactor))}</td>
+                  </tr>
+                  <tr>
+                    <th>Diametres admissibles</th>
+                    <td>${escapeHtml(formatDiameterCmList(candidate.compatibleRealDiameters))}</td>
+                  </tr>
+                </tbody>
+              </table>
+              ${renderReportWarningList(getCandidateWarnings(candidate))}
+            </div>
+          </div>
+
+          ${renderReportModelHighlights(candidate)}
+        </section>
+      `).join("");
+    }
+
+    function renderVariabilityZoneSummaryTable(design) {
+      return `
+        <section class="report-section">
+          <h4>Zones couvertes</h4>
+          <table class="report-table compact">
+            <thead>
+              <tr>
+                <th>Zone</th>
+                <th>Dimensions</th>
+                <th>Cellules actives</th>
+                <th>Surface cible</th>
+                <th>Surface mobilisee</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${design.zoneSummaries.map((zoneSummary) => `
+                <tr>
+                  <td>${escapeHtml(zoneSummary.name)}</td>
+                  <td>${escapeHtml(`${formatMeters(zoneSummary.length)} × ${formatMeters(zoneSummary.width)}`)}</td>
+                  <td>${escapeHtml(String(zoneSummary.cellsCount))}</td>
+                  <td>${escapeHtml(formatSquareMeters(zoneSummary.area))}</td>
+                  <td>${escapeHtml(formatSquareMeters(zoneSummary.mobilizedArea))}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        </section>
+      `;
+    }
+
+    function renderVariabilityReportOptions(designs) {
+      return designs.map((design, index) => `
+        <section class="report-option">
+          <div class="report-option-head">
+            <div>
+              <h3>Option ${index + 1}</h3>
+              <p>${escapeHtml(`${design.fanCount} brasseur${design.fanCount > 1 ? "s" : ""} actifs sur ${design.nx} × ${design.ny} cellules - ${design.mountMode.label}`)}</p>
+            </div>
+          </div>
+
+          ${renderReportMetricGrid([
+            ["Diametre retenu", formatMeters(design.diameter)],
+            ["Trame", `${design.nx} × ${design.ny}`],
+            ["Cellules actives", `${design.fanCount} / ${design.totalCells}`],
+            ["FCC reel", formatFactor(design.coverageFactor)],
+            ["Surface cible", formatSquareMeters(design.targetArea)],
+            ["Debordement", formatSquareMeters(design.spillArea)]
+          ])}
+
+          <div class="report-plan-block">
+            <div class="report-plan">${svgForVariabilityDesign(design)}</div>
+            <div class="report-side">
+              <table class="report-table">
+                <tbody>
+                  <tr>
+                    <th>Cellule</th>
+                    <td>${escapeHtml(`${formatMeters(design.cellLength)} × ${formatMeters(design.cellWidth)}`)}</td>
+                  </tr>
+                  <tr>
+                    <th>Montage</th>
+                    <td>${escapeHtml(`${design.mountMode.label} (${formatMeters(design.mountDistance)})`)}</td>
+                  </tr>
+                  <tr>
+                    <th>Diametres admissibles</th>
+                    <td>${escapeHtml(formatDiameterCmList(design.compatibleRealDiameters))}</td>
+                  </tr>
+                  <tr>
+                    <th>Mur limitant</th>
+                    <td>${escapeHtml(formatMeters(design.wallClearance))}</td>
+                  </tr>
+                  <tr>
+                    <th>Entraxe mini</th>
+                    <td>${escapeHtml(design.interFanSpacing ? formatMeters(design.interFanSpacing) : "Non applicable")}</td>
+                  </tr>
+                </tbody>
+              </table>
+              ${renderReportWarningList(getVariabilityWarnings(design))}
+            </div>
+          </div>
+
+          ${renderVariabilityZoneSummaryTable(design)}
+          ${renderReportModelHighlights(design)}
+        </section>
+      `).join("");
+    }
+
+    function buildPdfReportStyles() {
+      return `
+        @page { size: A4; margin: 14mm; }
+        * { box-sizing: border-box; }
+        body {
+          margin: 0;
+          font-family: Inter, "Segoe UI", Arial, sans-serif;
+          color: #111827;
+          background: #ffffff;
+          line-height: 1.45;
+        }
+        .report-root { max-width: 190mm; margin: 0 auto; }
+        .report-cover {
+          display: grid;
+          gap: 14px;
+          padding-bottom: 14px;
+          border-bottom: 2px solid #d6d9df;
+          margin-bottom: 18px;
+        }
+        .report-cover-kicker {
+          margin: 0;
+          color: #6b7280;
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+        }
+        .report-cover h1 {
+          margin: 0;
+          font-size: 24px;
+          line-height: 1.15;
+        }
+        .report-cover p {
+          margin: 0;
+          color: #4b5563;
+          font-size: 13px;
+        }
+        .report-meta-grid,
+        .report-metrics {
+          display: grid;
+          gap: 10px;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+        .report-meta-item,
+        .report-metric {
+          border: 1px solid #d6d9df;
+          border-radius: 10px;
+          padding: 10px 12px;
+          background: #f9fafb;
+        }
+        .report-meta-item strong,
+        .report-metric strong {
+          display: block;
+          margin-bottom: 4px;
+          color: #6b7280;
+          font-size: 10px;
+          font-weight: 700;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+        }
+        .report-meta-item span,
+        .report-metric span {
+          display: block;
+          font-size: 13px;
+          font-weight: 600;
+        }
+        .report-block,
+        .report-option,
+        .report-section,
+        .report-note {
+          break-inside: avoid;
+          page-break-inside: avoid;
+        }
+        .report-block {
+          margin-bottom: 18px;
+        }
+        .report-block h2 {
+          margin: 0 0 10px;
+          font-size: 17px;
+        }
+        .report-block > p {
+          margin: 0;
+          color: #4b5563;
+          font-size: 12px;
+        }
+        .report-option {
+          margin-top: 16px;
+          padding-top: 16px;
+          border-top: 1px solid #d6d9df;
+        }
+        .report-option-head h3 {
+          margin: 0;
+          font-size: 16px;
+        }
+        .report-option-head p {
+          margin: 4px 0 0;
+          color: #4b5563;
+          font-size: 12px;
+        }
+        .report-plan-block {
+          display: grid;
+          gap: 14px;
+          grid-template-columns: minmax(0, 1.3fr) minmax(0, 0.9fr);
+          align-items: start;
+          margin-top: 12px;
+        }
+        .report-plan {
+          border: 1px solid #d6d9df;
+          border-radius: 10px;
+          padding: 10px;
+          background: #f9fafb;
+        }
+        .report-plan svg {
+          width: 100%;
+          height: auto;
+          display: block;
+        }
+        .report-side {
+          display: grid;
+          gap: 10px;
+        }
+        .report-table {
+          width: 100%;
+          border-collapse: collapse;
+          font-size: 11px;
+        }
+        .report-table th,
+        .report-table td {
+          padding: 8px 10px;
+          border: 1px solid #d6d9df;
+          vertical-align: top;
+          text-align: left;
+        }
+        .report-table th {
+          background: #f9fafb;
+          color: #374151;
+          font-weight: 700;
+        }
+        .report-table.compact th,
+        .report-table.compact td {
+          padding: 7px 8px;
+          font-size: 10.5px;
+        }
+        .report-note {
+          border: 1px solid #d6d9df;
+          border-radius: 10px;
+          padding: 10px 12px;
+          background: #f9fafb;
+        }
+        .report-note-warning {
+          background: #fff6e5;
+          border-color: rgba(184, 109, 33, 0.24);
+        }
+        .report-note strong {
+          display: block;
+          margin-bottom: 6px;
+          font-size: 11px;
+        }
+        .report-note p,
+        .report-note ul {
+          margin: 0;
+          color: #4b5563;
+          font-size: 11px;
+        }
+        .report-note ul {
+          padding-left: 16px;
+        }
+        .report-footer {
+          margin-top: 20px;
+          padding-top: 12px;
+          border-top: 1px solid #d6d9df;
+          color: #4b5563;
+          font-size: 10.5px;
+        }
+        .report-footer strong {
+          color: #111827;
+        }
+        .report-footer a {
+          color: #1f4f82;
+          text-decoration: none;
+        }
+        @media print {
+          .report-root { max-width: none; }
+        }
+      `;
+    }
+
+    function buildPdfReportDocument(state) {
+      if (!state) {
+        return "";
+      }
+
+      const metaItems = [
+        ["Strategie", getStrategyLabel(state.strategy)],
+        ["Simulation", state.simulationName],
+        ["Montages etudies", state.modesLabel],
+        ["Genere le", formatDateTime(state.generatedAt)]
+      ];
+
+      let bodyContent = "";
+
+      if (state.kind === "uniformity-ok") {
+        const best = state.candidates[0];
+        bodyContent = `
+          <section class="report-block">
+            <h2>Synthese</h2>
+            ${renderReportMetricGrid([
+              ["Option recommandee", `${best.nx} × ${best.ny}`],
+              ["Brasseurs", `${best.fanCount}`],
+              ["Diametre retenu", formatMeters(best.diameter)],
+              ["FCC reel", formatFactor(best.coverageFactor)],
+              ["Montage", best.mountMode.label],
+              ["Modeles BRASSE II", `${getBrasse2ModelsForCandidate(best).length}`]
+            ])}
+          </section>
+
+          <section class="report-block">
+            <h2>Options classees</h2>
+            ${renderUniformityReportOptions(state.candidates)}
+          </section>
+        `;
+      } else if (state.kind === "uniformity-empty") {
+        bodyContent = `
+          <section class="report-block">
+            <h2>Conclusion</h2>
+            <div class="report-note report-note-warning">
+              <strong>Aucune solution compatible</strong>
+              <p>Aucun cas standard ou low-profile n'a pu etre valide avec les regles BRASSE de FCC, de distances et de hauteur.</p>
+            </div>
+            ${state.fallbackFlush ? `
+              <div class="report-note" style="margin-top:10px;">
+                <strong>Piste flush</strong>
+                <p>Un montage flush pourrait rouvrir une piste jusqu'a ${escapeHtml(formatMeters(state.fallbackFlush.diameter))}, avec la forte penalite de performance indiquee par le guide.</p>
+              </div>
+            ` : ""}
+          </section>
+        `;
+      } else if (state.kind === "variability-ok") {
+        const best = state.designs[0];
+        bodyContent = `
+          <section class="report-block">
+            <h2>Synthese</h2>
+            ${renderReportMetricGrid([
+              ["Option recommandee", `${best.nx} × ${best.ny}`],
+              ["Brasseurs actifs", `${best.fanCount}`],
+              ["Diametre retenu", formatMeters(best.diameter)],
+              ["Debordement", formatSquareMeters(best.spillArea)],
+              ["Surface cible", formatSquareMeters(best.targetArea)],
+              ["Montage", best.mountMode.label]
+            ])}
+          </section>
+
+          <section class="report-block">
+            <h2>Options classees</h2>
+            ${renderVariabilityReportOptions(state.designs)}
+          </section>
+        `;
+      } else if (state.kind === "variability-empty") {
+        bodyContent = `
+          <section class="report-block">
+            <h2>Conclusion</h2>
+            <div class="report-note report-note-warning">
+              <strong>Aucune trame valide</strong>
+              <p>Le moteur n'a pas trouve de trame reguliere conforme aux regles BRASSE pour couvrir les rectangles cibles saisis.</p>
+            </div>
+            ${state.issues && state.issues.length > 0 ? `
+              <div class="report-note" style="margin-top:10px;">
+                <strong>Motifs releves</strong>
+                <ul>
+                  ${state.issues.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
+                </ul>
+              </div>
+            ` : ""}
+          </section>
+        `;
+      } else if (state.kind === "invalid") {
+        bodyContent = `
+          <section class="report-block">
+            <h2>Calcul impossible</h2>
+            <div class="report-note report-note-warning">
+              <strong>Donnees invalides</strong>
+              <ul>
+                ${state.issues.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
+              </ul>
+            </div>
+          </section>
+        `;
+      }
+
+      return `
+        <!DOCTYPE html>
+        <html lang="fr">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>${escapeHtml(buildPdfFilename())}</title>
+          <style>${buildPdfReportStyles()}</style>
+        </head>
+        <body>
+          <main class="report-root">
+            <header class="report-cover">
+              <p class="report-cover-kicker">Rapport BRASSE</p>
+              <h1>${escapeHtml(state.simulationName)}</h1>
+              <p>${escapeHtml(state.context)}</p>
+              <div class="report-meta-grid">
+                ${metaItems.map(([label, value]) => `
+                  <article class="report-meta-item">
+                    <strong>${escapeHtml(label)}</strong>
+                    <span>${escapeHtml(value)}</span>
+                  </article>
+                `).join("")}
+              </div>
+            </header>
+            ${bodyContent}
+            <footer class="report-footer">
+              <strong>Nathan Chateau</strong>, conseiller en energie partage au Service Public Intercommunal de l'Energie,
+              <a href="mailto:nchateau@cccps.fr">nchateau@cccps.fr</a>, CCCPS et CCVD.
+            </footer>
+          </main>
+        </body>
+        </html>
+      `;
+    }
+
+    function buildPdfFilename() {
+      const base = getSimulationName()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-zA-Z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .toLowerCase();
+      const stamp = new Intl.DateTimeFormat("sv-SE", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit"
+      }).format(new Date());
+      return `${base || "simulation"}-${stamp}`;
+    }
+
+    function exportPdfReport() {
+      if (!latestReportState) {
+        return;
+      }
+
+      const reportHtml = buildPdfReportDocument(latestReportState);
+      if (typeof window.open === "function") {
+        const popup = window.open("", "_blank");
+        if (popup && popup.document) {
+          const triggerPrint = () => {
+            try {
+              popup.focus();
+              popup.print();
+            } catch (error) {
+              console.error("Impossible de lancer l'impression du rapport.", error);
+            }
+          };
+
+          popup.onload = () => {
+            window.setTimeout(triggerPrint, 150);
+          };
+          popup.document.open();
+          popup.document.write(reportHtml);
+          popup.document.close();
+          window.setTimeout(triggerPrint, 600);
+          return;
+        }
+      }
+
+      if (typeof window.print === "function") {
+        window.print();
+      }
+    }
+
+    function getSelectedModes() {
+      const modes = [];
+      if (allowStandardInput.checked) {
+        modes.push(MOUNT_MODES[0]);
+      }
+      if (allowLowInput.checked) {
+        modes.push(MOUNT_MODES[1]);
+      }
+      return modes;
+    }
+
+    function getRealDiametersForIntervals(intervals) {
+      return REAL_DIAMETERS.map((diameter) => {
+        const matchingInterval = intervals.find((interval) =>
+          diameter >= interval.lower - EPS && diameter <= interval.upper + EPS
+        );
+
+        if (!matchingInterval) {
+          return null;
+        }
+
+        return {
+          diameter,
+          fanClass: matchingInterval.fanClass
+        };
+      }).filter(Boolean);
+    }
+
+    function getCoverageFactorForDiameter(cellArea, diameter) {
+      return diameter / Math.sqrt(cellArea);
+    }
+
+    function isCoverageFactorValid(coverageFactor) {
+      return coverageFactor >= 0.2 - EPS && coverageFactor <= 0.4 + EPS;
+    }
+
+    function getCompatibleRealDiameters(intervals, cellArea) {
+      return getRealDiametersForIntervals(intervals).map((option) => {
+        const coverageFactor = getCoverageFactorForDiameter(cellArea, option.diameter);
+        if (!isCoverageFactorValid(coverageFactor)) {
+          return null;
+        }
+
+        return {
+          diameter: option.diameter,
+          fanClass: option.fanClass,
+          coverageFactor
+        };
+      }).filter(Boolean);
+    }
+
+    function getHeightCompatibleRealDiameters(intervals) {
+      return getRealDiametersForIntervals(intervals);
+    }
+
+    function buildHeightFeasibility(height, mountFactor, dGeoMin, dGeoMax) {
+      const lowerHeightBound = height / (2 + mountFactor);
+      const intervals = [];
+
+      const smallUpper = Math.min(
+        SMALL_FAN_LIMIT - EPS,
+        (height - SMALL_SAFETY_HEIGHT) / mountFactor
+      );
+      const smallLower = Math.max(dGeoMin, lowerHeightBound);
+      if (smallUpper > smallLower + EPS) {
+        intervals.push({
+          fanClass: "small",
+          lower: smallLower,
+          upper: Math.min(dGeoMax, smallUpper)
+        });
+      }
+
+      const largeUpper = Math.min(
+        (height - LARGE_SAFETY_HEIGHT) / mountFactor,
+        height / (0.8 + mountFactor),
+        dGeoMax
+      );
+      const largeLower = Math.max(dGeoMin, lowerHeightBound, SMALL_FAN_LIMIT);
+      if (largeUpper > largeLower + EPS) {
+        intervals.push({
+          fanClass: "large",
+          lower: largeLower,
+          upper: largeUpper
+        });
+      }
+
+      return intervals.filter((interval) => interval.upper > interval.lower + EPS);
+    }
+
+    function parseZoneDrafts(room) {
+      ensureVariabilityZones();
+      const issues = [];
+      const zones = variabilityZones.map((zone, index) => {
+        const centerX = Number.parseFloat(String(zone.centerX).replace(",", "."));
+        const centerY = Number.parseFloat(String(zone.centerY).replace(",", "."));
+        const length = Number.parseFloat(String(zone.length).replace(",", "."));
+        const width = Number.parseFloat(String(zone.width).replace(",", "."));
+
+        if (!(centerX > 0) || !(centerY > 0) || !(length > 0) || !(width > 0)) {
+          issues.push(`Zone ${index + 1} : renseignez des valeurs strictement positives.`);
+          return null;
+        }
+
+        const minX = centerX - length / 2;
+        const maxX = centerX + length / 2;
+        const minY = centerY - width / 2;
+        const maxY = centerY + width / 2;
+
+        if (minX < -EPS || maxX > room.length + EPS || minY < -EPS || maxY > room.width + EPS) {
+          issues.push(`Zone ${index + 1} : le rectangle cible doit rester entierement dans le local.`);
+          return null;
+        }
+
+        return {
+          id: zone.id,
+          name: `Zone ${index + 1}`,
+          centerX,
+          centerY,
+          length,
+          width,
+          minX,
+          maxX,
+          minY,
+          maxY,
+          area: length * width
+        };
+      }).filter(Boolean);
+
+      if (zones.length === 0) {
+        issues.push("Ajoutez au moins une zone cible.");
+      }
+
+      return { zones, issues };
+    }
+
+    function zonesOverlap(zoneA, zoneB) {
+      return (
+        zoneA.minX < zoneB.maxX - EPS &&
+        zoneA.maxX > zoneB.minX + EPS &&
+        zoneA.minY < zoneB.maxY - EPS &&
+        zoneA.maxY > zoneB.minY + EPS
+      );
+    }
+
+    function rectangleIntersectionArea(rectA, rectB) {
+      const overlapX = Math.max(0, Math.min(rectA.maxX, rectB.maxX) - Math.max(rectA.minX, rectB.minX));
+      const overlapY = Math.max(0, Math.min(rectA.maxY, rectB.maxY) - Math.max(rectA.minY, rectB.minY));
+      return overlapX * overlapY;
+    }
+
+    function pointInZones(x, y, zones) {
+      return zones.some((zone) => (
+        x >= zone.minX - EPS &&
+        x <= zone.maxX + EPS &&
+        y >= zone.minY - EPS &&
+        y <= zone.maxY + EPS
+      ));
+    }
+
+    function computeRectanglesUnionArea(rectangles) {
+      if (rectangles.length === 0) {
+        return 0;
+      }
+
+      const xs = [...new Set(
+        rectangles.flatMap((rectangle) => [rectangle.minX, rectangle.maxX])
+      )].sort((a, b) => a - b);
+      let area = 0;
+
+      for (let index = 0; index < xs.length - 1; index += 1) {
+        const x1 = xs[index];
+        const x2 = xs[index + 1];
+        const sliceWidth = x2 - x1;
+
+        if (sliceWidth <= EPS) {
+          continue;
+        }
+
+        const intervals = rectangles
+          .filter((rectangle) => rectangle.minX < x2 - EPS && rectangle.maxX > x1 + EPS)
+          .map((rectangle) => ({ minY: rectangle.minY, maxY: rectangle.maxY }))
+          .sort((a, b) => a.minY - b.minY);
+
+        if (intervals.length === 0) {
+          continue;
+        }
+
+        let coveredHeight = 0;
+        let currentStart = intervals[0].minY;
+        let currentEnd = intervals[0].maxY;
+
+        for (let intervalIndex = 1; intervalIndex < intervals.length; intervalIndex += 1) {
+          const interval = intervals[intervalIndex];
+          if (interval.minY <= currentEnd + EPS) {
+            currentEnd = Math.max(currentEnd, interval.maxY);
+          } else {
+            coveredHeight += currentEnd - currentStart;
+            currentStart = interval.minY;
+            currentEnd = interval.maxY;
+          }
+        }
+
+        coveredHeight += currentEnd - currentStart;
+        area += sliceWidth * coveredHeight;
+      }
+
+      return area;
+    }
+
+    function evaluateCandidate(room, nx, ny, mountMode) {
+      const cellLength = room.length / nx;
+      const cellWidth = room.width / ny;
+      const cellArea = cellLength * cellWidth;
+      const cellShort = Math.min(cellLength, cellWidth);
+      const cellLong = Math.max(cellLength, cellWidth);
+      const formFactor = cellLong / cellShort;
+      const coverageMinDiameter = 0.2 * Math.sqrt(cellArea);
+      const coverageMaxDiameter = 0.4 * Math.sqrt(cellArea);
+      const wallMaxDiameter = cellShort / 2;
+
+      const spacings = [];
+      if (nx > 1) {
+        spacings.push(cellLength);
+      }
+      if (ny > 1) {
+        spacings.push(cellWidth);
+      }
+
+      const interFanMaxDiameter = spacings.length > 0
+        ? Math.min(...spacings) / 2.5
+        : Infinity;
+
+      const dGeoMax = Math.min(coverageMaxDiameter, wallMaxDiameter, interFanMaxDiameter);
+      if (dGeoMax <= coverageMinDiameter + EPS) {
+        return null;
+      }
+
+      const intervals = buildHeightFeasibility(
+        room.height,
+        mountMode.factor,
+        coverageMinDiameter,
+        dGeoMax
+      );
+      if (intervals.length === 0) {
+        return null;
+      }
+
+      const bestInterval = intervals.reduce((best, current) =>
+        !best || current.upper > best.upper ? current : best
+      , null);
+      const theoreticalMaxDiameter = bestInterval.upper;
+      const compatibleRealDiameters = getCompatibleRealDiameters(intervals, cellArea);
+      if (compatibleRealDiameters.length === 0) {
+        return null;
+      }
+
+      const selectedRealDiameter = compatibleRealDiameters[compatibleRealDiameters.length - 1];
+      const diameter = selectedRealDiameter.diameter;
+      const mountDistance = mountMode.factor * diameter;
+      const bladeHeight = room.height - mountDistance;
+      const coverageFactor = selectedRealDiameter.coverageFactor;
+      const recommendedSmallHeight = 1.4 * diameter;
+      const recommendedSmallHeightMet = selectedRealDiameter.fanClass === "small"
+        ? bladeHeight >= recommendedSmallHeight - EPS
+        : true;
+
+      const coordinates = [];
+      for (let ix = 0; ix < nx; ix += 1) {
+        for (let iy = 0; iy < ny; iy += 1) {
+          coordinates.push({
+            x: (ix + 0.5) * cellLength,
+            y: (iy + 0.5) * cellWidth
+          });
+        }
+      }
+
+      return {
+        key: `${nx}x${ny}-${mountMode.id}`,
+        nx,
+        ny,
+        fanCount: nx * ny,
+        room,
+        mountMode,
+        cellLength,
+        cellWidth,
+        cellArea,
+        cellShort,
+        cellLong,
+        formFactor,
+        diameter,
+        theoreticalMaxDiameter,
+        coverageFactor,
+        mountDistance,
+        bladeHeight,
+        recommendedSmallHeightMet,
+        recommendedSmallHeight,
+        wallClearance: cellShort / 2,
+        interFanSpacing: spacings.length > 0 ? Math.min(...spacings) : null,
+        geometryCaps: {
+          coverageMinDiameter,
+          coverageMaxDiameter,
+          wallMaxDiameter,
+          interFanMaxDiameter
+        },
+        compatibleRealDiameters,
+        coordinates,
+        fanClass: selectedRealDiameter.fanClass,
+        strictAdvice: "Verifier la fiche du modele retenu si son diametre nominal est proche d'une limite geometrique ou d'une limite de hauteur du guide."
+      };
+    }
+
+    function compareCandidates(a, b) {
+      const ffA = Math.abs(a.formFactor - 1);
+      const ffB = Math.abs(b.formFactor - 1);
+      if (Math.abs(ffA - ffB) > EPS) {
+        return ffA - ffB;
+      }
+
+      if (Math.abs(b.diameter - a.diameter) > EPS) {
+        return b.diameter - a.diameter;
+      }
+
+      if (Math.abs(b.theoreticalMaxDiameter - a.theoreticalMaxDiameter) > EPS) {
+        return b.theoreticalMaxDiameter - a.theoreticalMaxDiameter;
+      }
+
+      const covA = Math.abs(0.4 - a.coverageFactor);
+      const covB = Math.abs(0.4 - b.coverageFactor);
+      if (Math.abs(covA - covB) > EPS) {
+        return covA - covB;
+      }
+
+      if (a.mountMode.id !== b.mountMode.id) {
+        return a.mountMode.id === "standard" ? -1 : 1;
+      }
+
+      return a.fanCount - b.fanCount;
+    }
+
+    function enumerateCandidates(room, maxFans, modes) {
+      const candidates = [];
+
+      for (let nx = 1; nx <= maxFans; nx += 1) {
+        for (let ny = 1; ny <= maxFans; ny += 1) {
+          if (nx * ny > maxFans) {
+            continue;
+          }
+
+          for (const mode of modes) {
+            const candidate = evaluateCandidate(room, nx, ny, mode);
+            if (candidate) {
+              candidates.push(candidate);
+            }
+          }
+        }
+      }
+
+      return candidates.sort(compareCandidates);
+    }
+
+    function getFallbackFlushCandidate(room, maxFans) {
+      const candidates = [];
+
+      for (let nx = 1; nx <= maxFans; nx += 1) {
+        for (let ny = 1; ny <= maxFans; ny += 1) {
+          if (nx * ny > maxFans) {
+            continue;
+          }
+          const candidate = evaluateCandidate(room, nx, ny, FLUSH_MODE);
+          if (candidate) {
+            candidates.push(candidate);
+          }
+        }
+      }
+
+      return candidates.sort(compareCandidates)[0] || null;
+    }
+
+    function createSummaryCard(label, value, detail) {
+      return `
+        <article class="summary-card">
+          <strong>${label}</strong>
+          <span>${value}</span>
+          <div class="hint">${detail}</div>
+        </article>
+      `;
+    }
+
+    function createBadge(label, variant = "") {
+      return `<span class="badge${variant ? ` ${variant}` : ""}">${label}</span>`;
+    }
+
+    function svgLabelBox(x, y, label, anchor = "middle", fontSize = 10.5) {
+      const textWidth = Math.max(54, label.length * (fontSize * 0.6));
+      let rectX = x - textWidth / 2 - 6;
+
+      if (anchor === "start") {
+        rectX = x - 6;
+      } else if (anchor === "end") {
+        rectX = x - textWidth - 6;
+      }
+
+      return `
+        <g>
+          <rect x="${rectX}" y="${y - 12}" width="${textWidth + 12}" height="18" rx="9"
+            fill="rgba(255,250,242,0.96)" stroke="rgba(29,47,44,0.12)" />
+          <text x="${x}" y="${y + 1.5}" text-anchor="${anchor}" font-size="${fontSize}" fill="#163531" font-weight="700">${label}</text>
+        </g>
+      `;
+    }
+
+    function svgDimensionLine(x1, y1, x2, y2, label, anchor = "middle", offsetX = 0, offsetY = -8, fontSize = 10.5) {
+      const labelX = (x1 + x2) / 2 + offsetX;
+      const labelY = (y1 + y2) / 2 + offsetY;
+      const isHorizontal = Math.abs(x2 - x1) >= Math.abs(y2 - y1);
+      const startTick = isHorizontal
+        ? `<line x1="${x1}" y1="${y1 - 5}" x2="${x1}" y2="${y1 + 5}" stroke="#b86d21" stroke-width="2" />`
+        : `<line x1="${x1 - 5}" y1="${y1}" x2="${x1 + 5}" y2="${y1}" stroke="#b86d21" stroke-width="2" />`;
+      const endTick = isHorizontal
+        ? `<line x1="${x2}" y1="${y2 - 5}" x2="${x2}" y2="${y2 + 5}" stroke="#b86d21" stroke-width="2" />`
+        : `<line x1="${x2 - 5}" y1="${y2}" x2="${x2 + 5}" y2="${y2}" stroke="#b86d21" stroke-width="2" />`;
+
+      return `
+        <g>
+          <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#b86d21" stroke-width="2" />
+          ${startTick}
+          ${endTick}
+          ${svgLabelBox(labelX, labelY, label, anchor, fontSize)}
+        </g>
+      `;
+    }
+
+    function svgFanSymbol(cx, cy, radius, index) {
+      const bladeLength = radius * 0.78;
+      const bladeWidth = Math.max(7, radius * 0.24);
+      const hubRadius = Math.max(6, radius * 0.16);
+      const bladeShape = `
+        <path d="
+          M ${hubRadius * 0.35} ${-bladeWidth / 2}
+          Q ${bladeLength * 0.48} ${-bladeWidth * 0.72} ${bladeLength} 0
+          Q ${bladeLength * 0.48} ${bladeWidth * 0.72} ${hubRadius * 0.35} ${bladeWidth / 2}
+          Z
+        " fill="#c9d3df" stroke="#6b7280" stroke-width="1.2" />
+      `;
+
+      return `
+        <g>
+          <circle cx="${cx}" cy="${cy}" r="${radius}" fill="rgba(31,79,130,0.06)" stroke="rgba(31,79,130,0.45)" stroke-width="1.6" stroke-dasharray="5 4" />
+          <g transform="translate(${cx} ${cy})">
+            <g transform="rotate(0)">${bladeShape}</g>
+            <g transform="rotate(120)">${bladeShape}</g>
+            <g transform="rotate(240)">${bladeShape}</g>
+            <circle cx="0" cy="0" r="${hubRadius}" fill="#4b5563" />
+            <circle cx="0" cy="0" r="${Math.max(2.6, hubRadius * 0.35)}" fill="#f9fafb" />
+          </g>
+          <circle cx="${cx}" cy="${cy}" r="5" fill="#111827" />
+          <text x="${cx}" y="${cy + 3.8}" text-anchor="middle" font-size="9" fill="#ffffff" font-weight="700">${index + 1}</text>
+        </g>
+      `;
+    }
+
+    function getPlanCanvasMetrics(candidate) {
+      const roomAspectRatio = Math.max(candidate.room.length, candidate.room.width) / Math.min(candidate.room.length, candidate.room.width);
+      const rotateForFit = roomAspectRatio >= 2.2 && candidate.room.length > candidate.room.width;
+
+      if (rotateForFit) {
+        return {
+          roomAspectRatio,
+          rotateForFit,
+          canvasWidth: 320,
+          canvasHeight: 400,
+          wrapMinHeight: 392
+        };
+      }
+
+      if (roomAspectRatio >= 1.55) {
+        return {
+          roomAspectRatio,
+          rotateForFit,
+          canvasWidth: 360,
+          canvasHeight: 290,
+          wrapMinHeight: 320
+        };
+      }
+
+      return {
+        roomAspectRatio,
+        rotateForFit,
+        canvasWidth: 360,
+        canvasHeight: 250,
+        wrapMinHeight: 280
+      };
+    }
+
+    function planWrapStyle(candidate) {
+      const { wrapMinHeight } = getPlanCanvasMetrics(candidate);
+      return `--plan-min-height:${wrapMinHeight}px;`;
+    }
+
+    function svgForCandidate(candidate) {
+      const {
+        roomAspectRatio,
+        rotateForFit,
+        canvasWidth,
+        canvasHeight
+      } = getPlanCanvasMetrics(candidate);
+      const paddingX = 28;
+      const paddingY = 28;
+      const displayRoomLength = rotateForFit ? candidate.room.width : candidate.room.length;
+      const displayRoomHeight = rotateForFit ? candidate.room.length : candidate.room.width;
+      const scale = Math.min(
+        (canvasWidth - paddingX * 2) / displayRoomLength,
+        (canvasHeight - paddingY * 2) / displayRoomHeight
+      );
+      const width = canvasWidth;
+      const height = canvasHeight;
+      const roomWidth = displayRoomLength * scale;
+      const roomHeight = displayRoomHeight * scale;
+      const roomX = (canvasWidth - roomWidth) / 2;
+      const roomY = (canvasHeight - roomHeight) / 2;
+      const compactMode = roomAspectRatio >= 2.4;
+      const labelFontSize = compactMode ? 9.2 : 10.5;
+      const compactOffset = compactMode ? 2 : 0;
+      const displayCoordinates = candidate.coordinates.map((point) => (
+        rotateForFit
+          ? { x: point.y, y: point.x }
+          : { x: point.x, y: point.y }
+      ));
+      const displayCellLength = rotateForFit ? candidate.cellWidth : candidate.cellLength;
+      const displayCellHeight = rotateForFit ? candidate.cellLength : candidate.cellWidth;
+      const displayNx = rotateForFit ? candidate.ny : candidate.nx;
+      const displayNy = rotateForFit ? candidate.nx : candidate.ny;
+
+      const gridLines = [];
+      for (let i = 1; i < displayNx; i += 1) {
+        const x = roomX + i * displayCellLength * scale;
+        gridLines.push(`<line x1="${x}" y1="${roomY}" x2="${x}" y2="${roomY + roomHeight}" stroke="rgba(29,47,44,0.18)" stroke-dasharray="6 5" />`);
+      }
+      for (let j = 1; j < displayNy; j += 1) {
+        const y = roomY + j * displayCellHeight * scale;
+        gridLines.push(`<line x1="${roomX}" y1="${y}" x2="${roomX + roomWidth}" y2="${y}" stroke="rgba(29,47,44,0.18)" stroke-dasharray="6 5" />`);
+      }
+
+      const fans = displayCoordinates.map((point, index) => {
+        const cx = roomX + point.x * scale;
+        const cy = roomY + point.y * scale;
+        const r = (candidate.diameter / 2) * scale;
+        return svgFanSymbol(cx, cy, r, index);
+      }).join("");
+
+      const firstPoint = displayCoordinates[0];
+      const firstCx = roomX + firstPoint.x * scale;
+      const firstCy = roomY + firstPoint.y * scale;
+      const radius = (candidate.diameter / 2) * scale;
+      const measurements = [];
+
+      measurements.push(
+        svgDimensionLine(
+          firstCx - radius,
+          firstCy - radius - (compactMode ? 8 : 12),
+          firstCx + radius,
+          firstCy - radius - (compactMode ? 8 : 12),
+          `D ${formatMeters(candidate.diameter)}`,
+          "middle",
+          0,
+          compactMode ? -6 : -8,
+          labelFontSize
+        )
+      );
+
+      if (firstPoint.x <= firstPoint.y) {
+        measurements.push(
+          svgDimensionLine(
+            roomX,
+            Math.min(height - 14, firstCy + radius + (compactMode ? 12 : 16)),
+            firstCx,
+            Math.min(height - 14, firstCy + radius + (compactMode ? 12 : 16)),
+            `Mur ${formatMeters(firstPoint.x)}`,
+            "middle",
+            0,
+            compactMode ? -6 : -8,
+            labelFontSize
+          )
+        );
+      } else {
+        measurements.push(
+          svgDimensionLine(
+            Math.min(width - 16, firstCx + radius + (compactMode ? 12 : 16)),
+            roomY,
+            Math.min(width - 16, firstCx + radius + (compactMode ? 12 : 16)),
+            firstCy,
+            `Mur ${formatMeters(firstPoint.y)}`,
+            "start",
+            8 + compactOffset,
+            -2,
+            labelFontSize
+          )
+        );
+      }
+
+      if (candidate.interFanSpacing) {
+        const horizontalSpacing = displayNx > 1 ? displayCellLength : Infinity;
+        const verticalSpacing = displayNy > 1 ? displayCellHeight : Infinity;
+
+        if (horizontalSpacing <= verticalSpacing) {
+          const secondCx = roomX + (firstPoint.x + displayCellLength) * scale;
+          const lineY = Math.max(roomY + 10, firstCy - radius - (compactMode ? 26 : 34));
+          measurements.push(
+            svgDimensionLine(
+              firstCx,
+              lineY,
+              secondCx,
+              lineY,
+              `Entraxe ${formatMeters(displayCellLength)}`,
+              "middle",
+              0,
+              compactMode ? -6 : -8,
+              labelFontSize
+            )
+          );
+        } else {
+          const secondCy = roomY + (firstPoint.y + displayCellHeight) * scale;
+          const lineX = Math.min(width - 12, firstCx + radius + (compactMode ? 24 : 32));
+          measurements.push(
+            svgDimensionLine(
+              lineX,
+              firstCy,
+              lineX,
+              secondCy,
+              `Entraxe ${formatMeters(displayCellHeight)}`,
+              "start",
+              8 + compactOffset,
+              -2,
+              labelFontSize
+            )
+          );
+        }
+      }
+
+      return `
+        <svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+          <rect x="${roomX}" y="${roomY}" width="${roomWidth}" height="${roomHeight}" rx="18" fill="#faf5eb" stroke="rgba(29,47,44,0.2)" stroke-width="2.5" />
+          ${gridLines.join("")}
+          ${fans}
+          ${measurements.join("")}
+        </svg>
+      `;
+    }
+
+    function getBrasse2ModelsForCandidate(candidate) {
+      const optionsByDiameterCm = new Map(
+        candidate.compatibleRealDiameters.map((option) => [Math.round(option.diameter * 100), option])
+      );
+
+      return brasse2Models
+        .filter((model) => optionsByDiameterCm.has(model.diameterCm))
+        .map((model) => ({
+          ...model,
+          compatibleOption: optionsByDiameterCm.get(model.diameterCm),
+          mountFits: model.ceilingDistanceCm <= (candidate.mountMode.factor * optionsByDiameterCm.get(model.diameterCm).diameter * 100) + 0.5,
+          mountDeltaCm: Number((((candidate.mountMode.factor * optionsByDiameterCm.get(model.diameterCm).diameter * 100) - model.ceilingDistanceCm)).toFixed(1)),
+          isSelectedDiameter: Math.abs(model.diameterCm - Math.round(candidate.diameter * 100)) <= 0.5
+        }));
+    }
+
+    function pickBestModel(models, comparator) {
+      return [...models].sort(comparator)[0] || null;
+    }
+
+    function compareComfort(a, b) {
+      if (Math.abs(b.ceDirDeboutMax - a.ceDirDeboutMax) > EPS) {
+        return b.ceDirDeboutMax - a.ceDirDeboutMax;
+      }
+      if (Math.abs(a.lwaMaxDbA - b.lwaMaxDbA) > EPS) {
+        return a.lwaMaxDbA - b.lwaMaxDbA;
+      }
+      return a.powerMaxW - b.powerMaxW;
+    }
+
+    function compareEfficiency(a, b) {
+      if (Math.abs(b.cfeDirDeboutMax - a.cfeDirDeboutMax) > EPS) {
+        return b.cfeDirDeboutMax - a.cfeDirDeboutMax;
+      }
+      if (Math.abs(a.lwaMaxDbA - b.lwaMaxDbA) > EPS) {
+        return a.lwaMaxDbA - b.lwaMaxDbA;
+      }
+      return b.ceDirDeboutMax - a.ceDirDeboutMax;
+    }
+
+    function compareAcoustics(a, b) {
+      if (Math.abs(a.lwaMaxDbA - b.lwaMaxDbA) > EPS) {
+        return a.lwaMaxDbA - b.lwaMaxDbA;
+      }
+      if (Math.abs(b.ceDirDeboutMax - a.ceDirDeboutMax) > EPS) {
+        return b.ceDirDeboutMax - a.ceDirDeboutMax;
+      }
+      return a.powerMaxW - b.powerMaxW;
+    }
+
+    function compareCoverage(a, b) {
+      const coverageA = Number.isFinite(a.compatibleOption && a.compatibleOption.coverageFactor)
+        ? a.compatibleOption.coverageFactor
+        : -Infinity;
+      const coverageB = Number.isFinite(b.compatibleOption && b.compatibleOption.coverageFactor)
+        ? b.compatibleOption.coverageFactor
+        : -Infinity;
+
+      if (Math.abs(coverageB - coverageA) > EPS) {
+        return coverageB - coverageA;
+      }
+      return compareComfort(a, b);
+    }
+
+    function modelMountLabel(model) {
+      return model.mountFits
+        ? "Distance plafond/BA compatible"
+        : "Distance plafond/BA a verifier";
+    }
+
+    function renderModelCard(title, model) {
+      if (!model) {
+        return "";
+      }
+      const hasCoverageFactor = Number.isFinite(model.compatibleOption.coverageFactor);
+
+      return `
+        <article class="model-card">
+          <strong>${title}</strong>
+          <h4>${model.brand} - ${model.model}</h4>
+          <p>${model.motor} • ${model.fixation} • ${model.diameterCm} cm${model.isSelectedDiameter ? " • diametre retenu" : ""}</p>
+          <div class="model-stats">
+            <span>${hasCoverageFactor ? `FCC reel du calepinage: ${formatFactor(model.compatibleOption.coverageFactor)}` : `Diametre BRASSE II compatible: ${model.diameterCm} cm`}</span>
+            <span>CE direct debout Vmax: ${formatTemp(model.ceDirDeboutMax)}</span>
+            <span>CFE direct debout Vmax: ${formatNumber(model.cfeDirDeboutMax, 4)} °C/W</span>
+            <span>LwA Vmax: ${formatDb(model.lwaMaxDbA)}</span>
+            <span>${modelMountLabel(model)} (${formatNumber(model.ceilingDistanceCm, 1)} cm de base)</span>
+          </div>
+        </article>
+      `;
+    }
+
+    function buildModelPicks(models) {
+      return [
+        { title: "FCC", model: pickBestModel(models, compareCoverage) },
+        { title: "Confort", model: pickBestModel(models, compareComfort) },
+        { title: "Efficacite", model: pickBestModel(models, compareEfficiency) },
+        { title: "Acoustique", model: pickBestModel(models, compareAcoustics) }
+      ].filter((pick) => Boolean(pick.model));
+    }
+
+    function renderModelsTable(models) {
+      return `
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Diam.</th>
+                <th>FCC reel</th>
+                <th>Marque</th>
+                <th>Modele</th>
+                <th>Moteur</th>
+                <th>Fixation</th>
+                <th>Plafond/BA</th>
+                <th>CE dir debout Vmax</th>
+                <th>CFE dir debout Vmax</th>
+                <th>CE moyen Vmax</th>
+                <th>LwA Vmax</th>
+                <th>Lecture montage</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${models.map((model) => `
+                <tr>
+                  <td>${model.diameterCm}</td>
+                  <td>${Number.isFinite(model.compatibleOption.coverageFactor) ? formatFactor(model.compatibleOption.coverageFactor) : "—"}</td>
+                  <td>${model.brand}</td>
+                  <td>${model.model}</td>
+                  <td>${model.motor}</td>
+                  <td>${model.fixation}</td>
+                  <td>${formatNumber(model.ceilingDistanceCm, 1)} cm</td>
+                  <td>${formatTemp(model.ceDirDeboutMax)}</td>
+                  <td>${formatNumber(model.cfeDirDeboutMax, 4)} °C/W</td>
+                  <td>${formatTemp(model.ceAvgMax)}</td>
+                  <td>${formatDb(model.lwaMaxDbA)}</td>
+                  <td>${modelMountLabel(model)}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    function renderBrasse2Section(candidate) {
+      const models = getBrasse2ModelsForCandidate(candidate);
+
+      if (models.length === 0) {
+        return `
+          <section class="models-shell">
+            <div>
+              <h4 class="section-title">Modeles BRASSE II</h4>
+              <p class="section-subtitle" style="margin-bottom:0;">
+                Filtrage sur les diametres BRASSE II admissibles pour ce calepinage.
+              </p>
+            </div>
+            <div class="notice warning">
+              <strong>Aucun modele BRASSE II compatible.</strong>
+              La base embarquee couvre ici les diametres disponibles dans BRASSE II :
+              <code>${formatDiameterList(REAL_DIAMETERS)}</code>.
+            </div>
+          </section>
+        `;
+      }
+
+      const sortedModels = [...models].sort((a, b) => {
+        if (a.isSelectedDiameter !== b.isSelectedDiameter) {
+          return a.isSelectedDiameter ? -1 : 1;
+        }
+        if (Math.abs(b.compatibleOption.diameter - a.compatibleOption.diameter) > EPS) {
+          return b.compatibleOption.diameter - a.compatibleOption.diameter;
+        }
+        return compareComfort(a, b);
+      });
+      const modelPicks = buildModelPicks(models);
+
+      return `
+        <section class="models-shell">
+          <div>
+            <h4 class="section-title">Modeles BRASSE II</h4>
+            <p class="section-subtitle" style="margin-bottom:0;">
+              Filtrage sur tous les diametres admissibles. Les cartes ci-dessous lisent le meilleur FCC du calepinage,
+              puis les indicateurs BRASSE a Vmax : confort direct debout, efficacite directe debout et acoustique.
+            </p>
+          </div>
+
+          <div class="models-grid">
+            ${modelPicks.map((pick) => renderModelCard(pick.title, pick.model)).join("")}
+          </div>
+
+          <details class="models-details">
+            <summary>Voir tous les modeles BRASSE II compatibles (${models.length})</summary>
+            ${renderModelsTable(sortedModels)}
+          </details>
+        </section>
+      `;
+    }
+
+    function candidateCard(candidate, rank, tags = []) {
+      const badges = [
+        createBadge(`${candidate.nx} × ${candidate.ny} cellules`),
+        createBadge(candidate.mountMode.label, candidate.mountMode.severity === "warn" ? "warn" : ""),
+        ...tags
+      ].join("");
+
+      const warnings = [];
+      if (!candidate.recommendedSmallHeightMet && candidate.fanClass === "small") {
+        warnings.push("La recommandation d'aisance > 1,4 D n'est pas atteinte.");
+      }
+      if (candidate.mountMode.id === "low-profile") {
+        warnings.push(candidate.mountMode.penaltyText);
+      }
+
+      return `
+        <article class="result-card">
+          <div class="result-head">
+            <div>
+              <h3 class="result-title">Option ${rank}</h3>
+              <p class="result-subtitle">
+                ${candidate.fanCount} brasseur${candidate.fanCount > 1 ? "s" : ""} centre${candidate.fanCount > 1 ? "s" : ""}
+                dans des cellules de ${formatMeters(candidate.cellLength)} × ${formatMeters(candidate.cellWidth)},
+                avec un diametre BRASSE II retenu de ${formatMeters(candidate.diameter)}, proche mais inferieur au maximum theorique.
+              </p>
+            </div>
+            <div class="badge-row">${badges}</div>
+          </div>
+
+          <div class="result-grid">
+            <div class="plan-wrap" style="${planWrapStyle(candidate)}">${svgForCandidate(candidate)}</div>
+
+            <div class="stack">
+              <div class="metric-grid">
+                <div class="metric-card">
+                  <strong>Diametre réel retenu</strong>
+                  <span>${formatMeters(candidate.diameter)}</span>
+                </div>
+                <div class="metric-card">
+                  <strong>Diametre theorique max</strong>
+                  <span>${formatMeters(candidate.theoreticalMaxDiameter)}</span>
+                </div>
+                <div class="metric-card">
+                  <strong>Facteur de forme</strong>
+                  <span>${formatFactor(candidate.formFactor)}</span>
+                </div>
+                <div class="metric-card">
+                  <strong>FCC reel</strong>
+                  <span>${formatFactor(candidate.coverageFactor)}</span>
+                </div>
+              </div>
+
+              <div class="detail-list">
+                <div class="detail-item">
+                  <strong>Montage</strong>
+                  <span>${candidate.mountMode.label}</span>
+                </div>
+                <div class="detail-item">
+                  <strong>Hauteur sous pales</strong>
+                  <span class="detail-value-stack">
+                    <span>${formatMeters(candidate.bladeHeight)}</span>
+                    <span class="detail-subtext">Plafond-pales: ${formatMeters(candidate.mountDistance)}</span>
+                  </span>
+                </div>
+                <div class="detail-item">
+                  <strong>Murs</strong>
+                  <span>Centre vers mur le plus proche: ${formatMeters(candidate.wallClearance)} &gt; ${formatMeters(candidate.diameter)}</span>
+                </div>
+                <div class="detail-item">
+                  <strong>Entre brasseurs</strong>
+                  <span>${candidate.interFanSpacing ? `${formatMeters(candidate.interFanSpacing)} &gt; ${formatNumber(2.5, 1)} × D` : "Non applicable (un seul brasseur)"}</span>
+                </div>
+                <div class="detail-item detail-item-stack">
+                  <strong>Diametres BRASSE II admissibles (FCC &gt;= 0,2)</strong>
+                  <span>${candidate.compatibleRealDiameters.map((option) => formatDiameterCm(option.diameter)).join(", ")}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          ${warnings.length > 0 ? `
+            <div class="notice warning">
+              <strong>Point d'attention.</strong>
+              ${warnings.join(" ")}
+            </div>
+          ` : ""}
+
+          ${renderBrasse2Section(candidate)}
+
+        </article>
+      `;
+    }
+
+    function uniqueBest(candidates, picker) {
+      const candidate = picker(candidates);
+      return candidate || null;
+    }
+
+    function renderSummary(room, candidates) {
+      const roomArea = room.length * room.width;
+      const best = candidates[0];
+      const bestBrasse2Matches = getBrasse2ModelsForCandidate(best);
+      const bestStandard = uniqueBest(
+        candidates.filter((candidate) => candidate.mountMode.id === "standard"),
+        (items) => items[0]
+      );
+      const biggest = uniqueBest([...candidates], (items) => {
+        return items.sort((a, b) => {
+          if (Math.abs(b.diameter - a.diameter) > EPS) {
+            return b.diameter - a.diameter;
+          }
+          return compareCandidates(a, b);
+        })[0];
+      });
+
+      summaryGrid.innerHTML = [
+        createSummaryCard("Piece", `${formatMeters(room.length)} × ${formatMeters(room.width)}`, `${formatSquareMeters(roomArea)} - HSP ${formatMeters(room.height)}`),
+        createSummaryCard("Recommandation uniformite", `${best.fanCount} brasseur${best.fanCount > 1 ? "s" : ""}`, `${best.nx} × ${best.ny} cellules - ${best.mountMode.label}`),
+        createSummaryCard("Diametre BRASSE II retenu", formatMeters(best.diameter), `Theorique max ${formatMeters(best.theoreticalMaxDiameter)} - FCC reel ${formatFactor(best.coverageFactor)}`),
+        createSummaryCard("Base BRASSE II", bestBrasse2Matches.length > 0 ? `${bestBrasse2Matches.length} modeles compatibles` : "Aucun modele compatible", "Selection sur CE, CFE et LwA a Vmax")
+      ].join("");
+
+      const highlightCards = [];
+
+      if (biggest && biggest.key !== best.key) {
+        highlightCards.push(createSummaryCard(
+          "Diametre maximal absolu",
+          formatMeters(biggest.diameter),
+          `${biggest.fanCount} brasseur${biggest.fanCount > 1 ? "s" : ""} - theorique ${formatMeters(biggest.theoreticalMaxDiameter)}`
+        ));
+      }
+
+      if (bestStandard && bestStandard.key !== best.key) {
+        highlightCards.push(createSummaryCard(
+          "Meilleure variante standard",
+          `${bestStandard.nx} × ${bestStandard.ny}`,
+          `${formatMeters(bestStandard.diameter)} retenu - theorique ${formatMeters(bestStandard.theoreticalMaxDiameter)}`
+        ));
+      }
+
+      highlights.innerHTML = highlightCards.join("");
+    }
+
+    function renderStatusNote(room, candidates, fallbackFlush) {
+      const roomFormFactor = Math.max(room.length, room.width) / Math.min(room.length, room.width);
+      const notes = [];
+
+      if (candidates.length > 0) {
+        const best = candidates[0];
+        notes.push(`
+          <div class="notice">
+            <strong>Lecture des résultats:</strong>
+            <ul style="margin:8px 0 0; padding-left:18px;">
+              <li>
+                <strong>Choix du calepinage:</strong> l'outil teste des trames regulieres sur tout le local et ne garde
+                que celles qui respectent les regles BRASSE de distances, de hauteur et de FCC. L'option 1 est celle
+                qui privilegie d'abord les cellules les plus equilibrées pour l'uniformite, puis le plus grand
+                diametre reel BRASSE II admissible.
+              </li>
+              <li>
+                <strong>Lecture du FCC reel:</strong> le FCC est recalcule avec le diametre reel retenu, pas avec le
+                diametre theorique. Entre <code>0,2</code> et <code>0,4</code>, le cas reste recevable. Plus le FCC reel
+                est proche de <code>0,2</code>, plus le diametre choisi est petit par rapport a la cellule. Plus il se
+                rapproche de <code>0,4</code>, plus la cellule est couverte.
+              </li>
+              <li>
+                <strong>Tri des brasseurs compatibles:</strong> seuls les modeles des diametres BRASSE II admissibles
+                sont proposes. Le tableau n'utilise pas de note globale entre <em>confort</em>, <em>efficacite</em> et
+                <em>acoustique</em>. Il affiche d'abord les modeles du diametre retenu, puis les autres diametres
+                compatibles du plus grand au plus petit, donc en pratique du <code>FCC reel</code> le plus fort vers le
+                plus faible. A diametre egal, le tri se fait ensuite sur le <em>confort</em> : meilleur <code>CE direct
+                debout</code>, puis plus faible <code>LwA</code>, puis plus faible puissance. Les cartes, elles,
+                montrent separement le meilleur modele en <em>FCC</em>, en <em>confort</em>, en <em>efficacite</em> et
+                en <em>acoustique</em>.
+              </li>
+            </ul>
+          </div>
+        `);
+
+        if (best.mountMode.id === "low-profile") {
+          notes.push(`
+            <div class="notice warning">
+              <strong>Le meilleur cas passe en low-profile.</strong>
+              Le guide indique alors une baisse de vitesse d'air d'environ 15 %. Une variante standard est egalement
+              affichee plus bas si elle existe. Le diametre retenu est choisi ici parmi les diametres reels disponibles.
+            </div>
+          `);
+        }
+      }
+
+      if (fallbackFlush && candidates.length === 0) {
+        notes.push(`
+          <div class="notice danger">
+            <strong>Aucune solution standard ou low-profile n'a ete trouvee.</strong>
+            Un montage flush pourrait rouvrir une piste jusqu'a ${formatMeters(fallbackFlush.diameter)}, mais le guide
+            annonce alors une perte de performance superieure a 40 % et demande de l'eviter au maximum.
+          </div>
+        `);
+      }
+
+      if (!fallbackFlush && candidates.length === 0) {
+        notes.push(`
+          <div class="notice danger">
+            <strong>Aucun diametre reel de la liste testee ne passe dans ce local.</strong>
+            L'outil a teste ${formatDiameterList(REAL_DIAMETERS)} avec les regles BRASSE
+            de FCC, de distances et de hauteur.
+          </div>
+        `);
+      }
+
+      statusNote.innerHTML = notes.join("");
+    }
+
+    function renderResults(candidates) {
+      const biggest = uniqueBest([...candidates], (items) => {
+        return items.sort((a, b) => {
+          if (Math.abs(b.diameter - a.diameter) > EPS) {
+            return b.diameter - a.diameter;
+          }
+          return compareCandidates(a, b);
+        })[0];
+      });
+
+      const bestStandard = uniqueBest(
+        candidates.filter((candidate) => candidate.mountMode.id === "standard"),
+        (items) => items[0]
+      );
+
+      const tagged = new Map();
+      if (candidates[0]) {
+        tagged.set(candidates[0].key, [createBadge("Uniformite prioritaire")]);
+      }
+      if (biggest) {
+        const list = tagged.get(biggest.key) || [];
+        list.push(createBadge("Diametre maxi"));
+        tagged.set(biggest.key, list);
+      }
+      if (bestStandard) {
+        const list = tagged.get(bestStandard.key) || [];
+        list.push(createBadge("Meilleur standard"));
+        tagged.set(bestStandard.key, list);
+      }
+
+      resultsList.innerHTML = candidates.slice(0, 5).map((candidate, index) => {
+        const tags = tagged.get(candidate.key) || [];
+        return candidateCard(candidate, index + 1, tags);
+      }).join("");
+    }
+
+    function buildVariabilitySelection(room, zones, nx, ny) {
+      const cellLength = room.length / nx;
+      const cellWidth = room.width / ny;
+      const cellArea = cellLength * cellWidth;
+      const selectedCells = [];
+      const zoneSummaries = zones.map((zone) => ({
+        ...zone,
+        cellsCount: 0,
+        mobilizedArea: 0,
+        cellRefs: []
+      }));
+
+      for (let ix = 0; ix < nx; ix += 1) {
+        for (let iy = 0; iy < ny; iy += 1) {
+          const cell = {
+            key: `${ix}-${iy}`,
+            ix,
+            iy,
+            minX: ix * cellLength,
+            maxX: (ix + 1) * cellLength,
+            minY: iy * cellWidth,
+            maxY: (iy + 1) * cellWidth,
+            centerX: (ix + 0.5) * cellLength,
+            centerY: (iy + 0.5) * cellWidth
+          };
+
+          const overlappingZoneIds = [];
+          zoneSummaries.forEach((zoneSummary) => {
+            if (rectangleIntersectionArea(cell, zoneSummary) > EPS) {
+              overlappingZoneIds.push(zoneSummary.id);
+              zoneSummary.cellsCount += 1;
+              zoneSummary.cellRefs.push(`${ix + 1} × ${iy + 1}`);
+            }
+          });
+
+          if (overlappingZoneIds.length > 0) {
+            selectedCells.push({
+              ...cell,
+              overlappingZoneIds
+            });
+          }
+        }
+      }
+
+      return {
+        cellLength,
+        cellWidth,
+        cellArea,
+        selectedCells,
+        zoneSummaries: zoneSummaries.map((zoneSummary) => ({
+          ...zoneSummary,
+          mobilizedArea: zoneSummary.cellsCount * cellArea
+        }))
+      };
+    }
+
+    function getMinimumWallClearance(room, selectedCells) {
+      let bestDistance = Infinity;
+      let bestCellKey = null;
+
+      for (const cell of selectedCells) {
+        const distance = Math.min(
+          cell.centerX,
+          room.length - cell.centerX,
+          cell.centerY,
+          room.width - cell.centerY
+        );
+
+        if (distance < bestDistance) {
+          bestDistance = distance;
+          bestCellKey = cell.key;
+        }
+      }
+
+      return {
+        distance: bestDistance,
+        cellKey: bestCellKey
+      };
+    }
+
+    function getMinimumCenterDistance(selectedCells) {
+      if (selectedCells.length < 2) {
+        return null;
+      }
+
+      let bestDistance = Infinity;
+      let bestPair = null;
+
+      for (let index = 0; index < selectedCells.length; index += 1) {
+        for (let otherIndex = index + 1; otherIndex < selectedCells.length; otherIndex += 1) {
+          const distance = Math.hypot(
+            selectedCells[index].centerX - selectedCells[otherIndex].centerX,
+            selectedCells[index].centerY - selectedCells[otherIndex].centerY
+          );
+
+          if (distance < bestDistance) {
+            bestDistance = distance;
+            bestPair = [selectedCells[index].key, selectedCells[otherIndex].key];
+          }
+        }
+      }
+
+      return {
+        distance: bestDistance,
+        pair: bestPair
+      };
+    }
+
+    function evaluateVariabilityDesign(room, zones, nx, ny, mountMode) {
+      const {
+        cellLength,
+        cellWidth,
+        cellArea,
+        selectedCells,
+        zoneSummaries
+      } = buildVariabilitySelection(room, zones, nx, ny);
+
+      if (selectedCells.length === 0) {
+        return null;
+      }
+
+      const cellShort = Math.min(cellLength, cellWidth);
+      const cellLong = Math.max(cellLength, cellWidth);
+      const formFactor = cellLong / cellShort;
+      const coverageMinDiameter = 0.2 * Math.sqrt(cellArea);
+      const coverageMaxDiameter = 0.4 * Math.sqrt(cellArea);
+      const wallInfo = getMinimumWallClearance(room, selectedCells);
+      const spacingInfo = getMinimumCenterDistance(selectedCells);
+      const interFanMaxDiameter = spacingInfo ? spacingInfo.distance / 2.5 : Infinity;
+      const dGeoMax = Math.min(coverageMaxDiameter, wallInfo.distance, interFanMaxDiameter);
+
+      if (dGeoMax <= coverageMinDiameter + EPS) {
+        return null;
+      }
+
+      const intervals = buildHeightFeasibility(
+        room.height,
+        mountMode.factor,
+        coverageMinDiameter,
+        dGeoMax
+      );
+      if (intervals.length === 0) {
+        return null;
+      }
+
+      const compatibleRealDiameters = getCompatibleRealDiameters(intervals, cellArea);
+      if (compatibleRealDiameters.length === 0) {
+        return null;
+      }
+
+      const bestInterval = intervals.reduce((best, current) =>
+        !best || current.upper > best.upper ? current : best
+      , null);
+      const theoreticalMaxDiameter = bestInterval.upper;
+      const selectedRealDiameter = compatibleRealDiameters[compatibleRealDiameters.length - 1];
+      const diameter = selectedRealDiameter.diameter;
+      const mountDistance = mountMode.factor * diameter;
+      const bladeHeight = room.height - mountDistance;
+      const coverageFactor = selectedRealDiameter.coverageFactor;
+      const recommendedSmallHeight = 1.4 * diameter;
+      const recommendedSmallHeightMet = selectedRealDiameter.fanClass === "small"
+        ? bladeHeight >= recommendedSmallHeight - EPS
+        : true;
+      const targetArea = computeRectanglesUnionArea(zones);
+      const selectedArea = selectedCells.length * cellArea;
+      const spillArea = Math.max(0, selectedArea - targetArea);
+      const spillRatio = targetArea > EPS ? spillArea / targetArea : 0;
+      const selectedCentersInsideCount = selectedCells.filter((cell) => pointInZones(cell.centerX, cell.centerY, zones)).length;
+      const selectedCentersOutsideCount = selectedCells.length - selectedCentersInsideCount;
+
+      return {
+        key: `variability-${nx}x${ny}-${mountMode.id}`,
+        room,
+        mountMode,
+        nx,
+        ny,
+        totalCells: nx * ny,
+        fanCount: selectedCells.length,
+        cellLength,
+        cellWidth,
+        cellArea,
+        cellShort,
+        cellLong,
+        formFactor,
+        diameter,
+        theoreticalMaxDiameter,
+        coverageFactor,
+        mountDistance,
+        bladeHeight,
+        recommendedSmallHeightMet,
+        recommendedSmallHeight,
+        wallClearance: wallInfo.distance,
+        interFanSpacing: spacingInfo ? spacingInfo.distance : null,
+        geometryCaps: {
+          coverageMinDiameter,
+          coverageMaxDiameter,
+          wallMaxDiameter: wallInfo.distance,
+          interFanMaxDiameter
+        },
+        compatibleRealDiameters,
+        coordinates: selectedCells.map((cell) => ({ x: cell.centerX, y: cell.centerY })),
+        fanClass: selectedRealDiameter.fanClass,
+        targetZones: zones,
+        selectedCells,
+        zoneSummaries,
+        targetArea,
+        selectedArea,
+        spillArea,
+        spillRatio,
+        selectedCentersInsideCount,
+        selectedCentersOutsideCount,
+        minimumWallCellKey: wallInfo.cellKey,
+        minimumSpacingPair: spacingInfo ? spacingInfo.pair : null
+      };
+    }
+
+    function compareVariabilityDesigns(a, b) {
+      if (Math.abs(a.spillArea - b.spillArea) > EPS) {
+        return a.spillArea - b.spillArea;
+      }
+
+      if (a.selectedCentersOutsideCount !== b.selectedCentersOutsideCount) {
+        return a.selectedCentersOutsideCount - b.selectedCentersOutsideCount;
+      }
+
+      if (a.fanCount !== b.fanCount) {
+        return a.fanCount - b.fanCount;
+      }
+
+      const ffA = Math.abs(a.formFactor - 1);
+      const ffB = Math.abs(b.formFactor - 1);
+      if (Math.abs(ffA - ffB) > EPS) {
+        return ffA - ffB;
+      }
+
+      if (a.mountMode.id !== b.mountMode.id) {
+        return a.mountMode.id === "standard" ? -1 : 1;
+      }
+
+      if (Math.abs(b.diameter - a.diameter) > EPS) {
+        return b.diameter - a.diameter;
+      }
+
+      if (Math.abs(b.theoreticalMaxDiameter - a.theoreticalMaxDiameter) > EPS) {
+        return b.theoreticalMaxDiameter - a.theoreticalMaxDiameter;
+      }
+
+      return a.totalCells - b.totalCells;
+    }
+
+    function enumerateVariabilityDesigns(room, zones, modes, maxFans = MAX_GRID_FANS) {
+      const designs = [];
+
+      for (let nx = 1; nx <= maxFans; nx += 1) {
+        for (let ny = 1; ny <= maxFans; ny += 1) {
+          if (nx * ny > maxFans) {
+            continue;
+          }
+
+          for (const mode of modes) {
+            const design = evaluateVariabilityDesign(room, zones, nx, ny, mode);
+            if (design) {
+              designs.push(design);
+            }
+          }
+        }
+      }
+
+      return designs.sort(compareVariabilityDesigns);
+    }
+
+    function svgForVariabilityDesign(design) {
+      const {
+        roomAspectRatio,
+        rotateForFit,
+        canvasWidth,
+        canvasHeight
+      } = getPlanCanvasMetrics(design);
+      const paddingX = 28;
+      const paddingY = 28;
+      const displayRoomLength = rotateForFit ? design.room.width : design.room.length;
+      const displayRoomHeight = rotateForFit ? design.room.length : design.room.width;
+      const scale = Math.min(
+        (canvasWidth - paddingX * 2) / displayRoomLength,
+        (canvasHeight - paddingY * 2) / displayRoomHeight
+      );
+      const width = canvasWidth;
+      const height = canvasHeight;
+      const roomWidth = displayRoomLength * scale;
+      const roomHeight = displayRoomHeight * scale;
+      const roomX = (canvasWidth - roomWidth) / 2;
+      const roomY = (canvasHeight - roomHeight) / 2;
+      const compactMode = roomAspectRatio >= 2.4;
+      const labelFontSize = compactMode ? 9.2 : 10.5;
+      const compactOffset = compactMode ? 2 : 0;
+      const displayCellLength = rotateForFit ? design.cellWidth : design.cellLength;
+      const displayCellHeight = rotateForFit ? design.cellLength : design.cellWidth;
+      const displayNx = rotateForFit ? design.ny : design.nx;
+      const displayNy = rotateForFit ? design.nx : design.ny;
+      const transformPoint = (point) => (
+        rotateForFit
+          ? { x: point.y, y: point.x }
+          : { x: point.x, y: point.y }
+      );
+      const transformRect = (rectangle) => {
+        const minPoint = transformPoint({ x: rectangle.minX, y: rectangle.minY });
+        const maxPoint = transformPoint({ x: rectangle.maxX, y: rectangle.maxY });
+
+        return {
+          x: roomX + Math.min(minPoint.x, maxPoint.x) * scale,
+          y: roomY + Math.min(minPoint.y, maxPoint.y) * scale,
+          width: Math.abs(maxPoint.x - minPoint.x) * scale,
+          height: Math.abs(maxPoint.y - minPoint.y) * scale
+        };
+      };
+      const displaySelectedCells = design.selectedCells.map((cell) => ({
+        ...cell,
+        displayCenter: transformPoint({ x: cell.centerX, y: cell.centerY }),
+        displayRect: transformRect(cell)
+      }));
+
+      const gridLines = [];
+      for (let i = 1; i < displayNx; i += 1) {
+        const x = roomX + i * displayCellLength * scale;
+        gridLines.push(`<line x1="${x}" y1="${roomY}" x2="${x}" y2="${roomY + roomHeight}" stroke="rgba(29,47,44,0.18)" stroke-dasharray="6 5" />`);
+      }
+      for (let j = 1; j < displayNy; j += 1) {
+        const y = roomY + j * displayCellHeight * scale;
+        gridLines.push(`<line x1="${roomX}" y1="${y}" x2="${roomX + roomWidth}" y2="${y}" stroke="rgba(29,47,44,0.18)" stroke-dasharray="6 5" />`);
+      }
+
+      const zoneShapes = design.targetZones.map((zone, index) => {
+        const rectangle = transformRect(zone);
+        return `
+          <g>
+            <rect x="${rectangle.x}" y="${rectangle.y}" width="${rectangle.width}" height="${rectangle.height}" rx="10"
+              fill="rgba(31,79,130,0.08)" stroke="rgba(31,79,130,0.35)" stroke-width="1.5" />
+            <text x="${rectangle.x + 8}" y="${rectangle.y + 14}" font-size="10" fill="#1f4f82" font-weight="700">Z${index + 1}</text>
+          </g>
+        `;
+      }).join("");
+
+      const selectedCellShapes = displaySelectedCells.map((cell) => `
+        <rect x="${cell.displayRect.x}" y="${cell.displayRect.y}" width="${cell.displayRect.width}" height="${cell.displayRect.height}" rx="8"
+          fill="rgba(31,79,130,0.10)" stroke="rgba(31,79,130,0.38)" stroke-width="1.4" />
+      `).join("");
+
+      const fans = displaySelectedCells.map((cell, index) => {
+        const cx = roomX + cell.displayCenter.x * scale;
+        const cy = roomY + cell.displayCenter.y * scale;
+        const r = (design.diameter / 2) * scale;
+        return svgFanSymbol(cx, cy, r, index);
+      }).join("");
+
+      const measurements = [];
+      const firstCell = displaySelectedCells[0];
+      if (firstCell) {
+        const firstCx = roomX + firstCell.displayCenter.x * scale;
+        const firstCy = roomY + firstCell.displayCenter.y * scale;
+        const radius = (design.diameter / 2) * scale;
+        measurements.push(
+          svgDimensionLine(
+            firstCx - radius,
+            firstCy - radius - (compactMode ? 8 : 12),
+            firstCx + radius,
+            firstCy - radius - (compactMode ? 8 : 12),
+            `D ${formatMeters(design.diameter)}`,
+            "middle",
+            0,
+            compactMode ? -6 : -8,
+            labelFontSize
+          )
+        );
+      }
+
+      if (design.minimumWallCellKey) {
+        const wallCell = displaySelectedCells.find((cell) => cell.key === design.minimumWallCellKey);
+        if (wallCell) {
+          const cx = roomX + wallCell.displayCenter.x * scale;
+          const cy = roomY + wallCell.displayCenter.y * scale;
+          const distances = [
+            { axis: "x", boundary: roomX, value: wallCell.displayCenter.x },
+            { axis: "x", boundary: roomX + roomWidth, value: displayRoomLength - wallCell.displayCenter.x },
+            { axis: "y", boundary: roomY, value: wallCell.displayCenter.y },
+            { axis: "y", boundary: roomY + roomHeight, value: displayRoomHeight - wallCell.displayCenter.y }
+          ].sort((a, b) => a.value - b.value);
+          const nearest = distances[0];
+
+          if (nearest.axis === "x") {
+            measurements.push(
+              svgDimensionLine(
+                nearest.boundary,
+                Math.min(height - 14, cy + (compactMode ? 20 : 24)),
+                cx,
+                Math.min(height - 14, cy + (compactMode ? 20 : 24)),
+                `Mur ${formatMeters(design.wallClearance)}`,
+                "middle",
+                0,
+                compactMode ? -6 : -8,
+                labelFontSize
+              )
+            );
+          } else {
+            measurements.push(
+              svgDimensionLine(
+                Math.min(width - 12, cx + (compactMode ? 20 : 24)),
+                nearest.boundary,
+                Math.min(width - 12, cx + (compactMode ? 20 : 24)),
+                cy,
+                `Mur ${formatMeters(design.wallClearance)}`,
+                "start",
+                8 + compactOffset,
+                -2,
+                labelFontSize
+              )
+            );
+          }
+        }
+      }
+
+      if (design.minimumSpacingPair) {
+        const firstSpacingCell = displaySelectedCells.find((cell) => cell.key === design.minimumSpacingPair[0]);
+        const secondSpacingCell = displaySelectedCells.find((cell) => cell.key === design.minimumSpacingPair[1]);
+        if (firstSpacingCell && secondSpacingCell) {
+          measurements.push(
+            svgDimensionLine(
+              roomX + firstSpacingCell.displayCenter.x * scale,
+              roomY + firstSpacingCell.displayCenter.y * scale,
+              roomX + secondSpacingCell.displayCenter.x * scale,
+              roomY + secondSpacingCell.displayCenter.y * scale,
+              `Entraxe ${formatMeters(design.interFanSpacing)}`,
+              "middle",
+              0,
+              compactMode ? -10 : -12,
+              labelFontSize
+            )
+          );
+        }
+      }
+
+      return `
+        <svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+          <rect x="${roomX}" y="${roomY}" width="${roomWidth}" height="${roomHeight}" rx="18" fill="#faf5eb" stroke="rgba(29,47,44,0.2)" stroke-width="2.5" />
+          ${gridLines.join("")}
+          ${zoneShapes}
+          ${selectedCellShapes}
+          ${fans}
+          ${measurements.join("")}
+        </svg>
+      `;
+    }
+
+    function renderVariabilityZoneSummary(zoneSummary) {
+      return `
+        <section class="zone-result-card">
+          <div class="zone-result-head">
+            <div>
+              <h4>${zoneSummary.name}</h4>
+              <p>Cible ${formatMeters(zoneSummary.length)} × ${formatMeters(zoneSummary.width)}</p>
+            </div>
+          </div>
+
+          <div class="metric-grid">
+            <div class="metric-card">
+              <strong>Cellules actives</strong>
+              <span>${zoneSummary.cellsCount}</span>
+            </div>
+            <div class="metric-card">
+              <strong>Surface cible</strong>
+              <span>${formatSquareMeters(zoneSummary.area)}</span>
+            </div>
+            <div class="metric-card">
+              <strong>Surface mobilisee</strong>
+              <span>${formatSquareMeters(zoneSummary.mobilizedArea)}</span>
+            </div>
+            <div class="metric-card">
+              <strong>Trame touchee</strong>
+              <span>${zoneSummary.cellRefs.length > 0 ? zoneSummary.cellRefs.join(", ") : "Aucune"}</span>
+            </div>
+          </div>
+        </section>
+      `;
+    }
+
+    function variabilityCard(design, rank, tags = []) {
+      const badges = [
+        createBadge(`${design.fanCount} brasseur${design.fanCount > 1 ? "s" : ""}`),
+        createBadge(`${design.nx} × ${design.ny} trame`),
+        createBadge(design.mountMode.label, design.mountMode.severity === "warn" ? "warn" : ""),
+        ...tags
+      ].join("");
+      const warnings = [];
+
+      if (!design.recommendedSmallHeightMet && design.fanClass === "small") {
+        warnings.push("La recommandation d'aisance > 1,4 D n'est pas atteinte.");
+      }
+      if (design.mountMode.id === "low-profile") {
+        warnings.push(design.mountMode.penaltyText);
+      }
+      if (design.selectedCentersOutsideCount > 0) {
+        warnings.push(`${design.selectedCentersOutsideCount} centre${design.selectedCentersOutsideCount > 1 ? "s" : ""} de cellule reste${design.selectedCentersOutsideCount > 1 ? "nt" : ""} hors des rectangles cibles, ce qui traduit le debordement de la trame.`);
+      }
+
+      const brasse2Models = getBrasse2ModelsForCandidate(design);
+
+      return `
+        <article class="result-card">
+          <div class="result-head">
+            <div>
+              <h3 class="result-title">Option ${rank}</h3>
+              <p class="result-subtitle">
+                ${design.fanCount} brasseur${design.fanCount > 1 ? "s" : ""} actif${design.fanCount > 1 ? "s" : ""} sur une trame
+                ${design.nx} × ${design.ny}, avec des cellules de ${formatMeters(design.cellLength)} × ${formatMeters(design.cellWidth)}.
+              </p>
+            </div>
+            <div class="badge-row">${badges}</div>
+          </div>
+
+          <div class="result-grid">
+            <div class="plan-wrap" style="${planWrapStyle(design)}">${svgForVariabilityDesign(design)}</div>
+
+            <div class="stack">
+              <div class="metric-grid">
+                <div class="metric-card">
+                  <strong>Diametre réel retenu</strong>
+                  <span>${formatMeters(design.diameter)}</span>
+                </div>
+                <div class="metric-card">
+                  <strong>Cellules actives</strong>
+                  <span>${design.fanCount} / ${design.totalCells}</span>
+                </div>
+                <div class="metric-card">
+                  <strong>Debordement hors zones</strong>
+                  <span>${formatSquareMeters(design.spillArea)}</span>
+                </div>
+                <div class="metric-card">
+                  <strong>FCC reel</strong>
+                  <span>${formatFactor(design.coverageFactor)}</span>
+                </div>
+              </div>
+
+              <div class="detail-list">
+                <div class="detail-item">
+                  <strong>Montage</strong>
+                  <span>${design.mountMode.label}</span>
+                </div>
+                <div class="detail-item">
+                  <strong>Hauteur sous pales</strong>
+                  <span class="detail-value-stack">
+                    <span>${formatMeters(design.bladeHeight)}</span>
+                    <span class="detail-subtext">Plafond-pales: ${formatMeters(design.mountDistance)}</span>
+                  </span>
+                </div>
+                <div class="detail-item">
+                  <strong>Diametre theorique max</strong>
+                  <span>${formatMeters(design.theoreticalMaxDiameter)}</span>
+                </div>
+                <div class="detail-item">
+                  <strong>Mur limitant</strong>
+                  <span>${formatMeters(design.wallClearance)} &gt; ${formatMeters(design.diameter)}</span>
+                </div>
+                <div class="detail-item">
+                  <strong>Entraxe mini</strong>
+                  <span>${design.interFanSpacing ? `${formatMeters(design.interFanSpacing)} &gt; ${formatNumber(2.5, 1)} × D` : "Non applicable (un seul brasseur)"}</span>
+                </div>
+                <div class="detail-item">
+                  <strong>Surface cible</strong>
+                  <span>${formatSquareMeters(design.targetArea)}</span>
+                </div>
+                <div class="detail-item">
+                  <strong>Surface mobilisee</strong>
+                  <span>${formatSquareMeters(design.selectedArea)}</span>
+                </div>
+                <div class="detail-item detail-item-stack">
+                  <strong>Diametres BRASSE II admissibles (FCC &gt;= 0,2)</strong>
+                  <span>${formatDiameterCmList(design.compatibleRealDiameters)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          ${warnings.length > 0 ? `
+            <div class="notice warning">
+              <strong>Point d'attention.</strong>
+              ${warnings.join(" ")}
+            </div>
+          ` : ""}
+
+          <div class="zone-results">
+            ${design.zoneSummaries.map((zoneSummary) => renderVariabilityZoneSummary(zoneSummary)).join("")}
+          </div>
+
+          ${brasse2Models.length > 0 ? renderBrasse2Section(design) : `
+            <section class="models-shell">
+              <div class="notice warning">
+                <strong>Aucun modele BRASSE II compatible.</strong>
+                Aucun modele de la base n'est disponible sur les diametres ${formatDiameterCmList(design.compatibleRealDiameters)}.
+              </div>
+            </section>
+          `}
+        </article>
+      `;
+    }
+
+    function renderVariabilitySummary(room, zones, designs) {
+      const bestDesign = designs[0] || null;
+      const bestStandard = designs.find((design) => design.mountMode.id === "standard") || null;
+      const lowestFanCount = designs[0]
+        ? [...designs].sort((a, b) => a.fanCount - b.fanCount || compareVariabilityDesigns(a, b))[0]
+        : null;
+      const bestBrasse2Matches = bestDesign ? getBrasse2ModelsForCandidate(bestDesign) : [];
+
+      summaryGrid.innerHTML = [
+        createSummaryCard("Strategie", "Zones a couvrir", `${zones.length} rectangle${zones.length > 1 ? "s" : ""} cible${zones.length > 1 ? "s" : ""}`),
+        createSummaryCard("Recommandation", bestDesign ? `${bestDesign.fanCount} brasseur${bestDesign.fanCount > 1 ? "s" : ""}` : "Aucune solution", bestDesign ? `${bestDesign.nx} × ${bestDesign.ny} trame - ${bestDesign.mountMode.label}` : "Aucune trame valide"),
+        createSummaryCard("Cellules actives", bestDesign ? `${bestDesign.fanCount} / ${bestDesign.totalCells}` : "0", bestDesign ? `${formatMeters(bestDesign.cellLength)} × ${formatMeters(bestDesign.cellWidth)}` : "Trame non validee"),
+        createSummaryCard("Base BRASSE II", bestBrasse2Matches.length > 0 ? `${bestBrasse2Matches.length} modeles compatibles` : "Aucun modele compatible", bestDesign ? `Diametre retenu ${formatMeters(bestDesign.diameter)}` : "Sans effet tant qu'aucune trame ne passe")
+      ].join("");
+
+      const highlightCards = [];
+
+      if (bestStandard) {
+        highlightCards.push(createSummaryCard(
+          "Meilleur standard",
+          `${bestStandard.fanCount} brasseur${bestStandard.fanCount > 1 ? "s" : ""}`,
+          `${bestStandard.nx} × ${bestStandard.ny} - debordement ${formatSquareMeters(bestStandard.spillArea)}`
+        ));
+      }
+
+      if (lowestFanCount && (!bestStandard || lowestFanCount.key !== bestStandard.key)) {
+        highlightCards.push(createSummaryCard(
+          "Moins de brasseurs",
+          `${lowestFanCount.fanCount}`,
+          `${lowestFanCount.nx} × ${lowestFanCount.ny} - ${formatMeters(lowestFanCount.diameter)}`
+        ));
+      }
+
+      highlights.innerHTML = highlightCards.join("");
+    }
+
+    function renderVariabilityStatusNote(zones, designs) {
+      const notes = [
+        `
+          <div class="notice">
+            <strong>Lecture du mode zones.</strong>
+            Le moteur explore ici des trames regulieres ancrees au local, puis active les cellules qui intersectent
+            les rectangles cibles. Ce redécoupage en cellules est une aide a la conception de l'outil, avec
+            verification BRASSE ensuite sur le FCC, les murs, les entraxes, le montage et la hauteur.
+          </div>
+        `
+      ];
+
+      const overlapPairs = [];
+      for (let index = 0; index < zones.length; index += 1) {
+        for (let otherIndex = index + 1; otherIndex < zones.length; otherIndex += 1) {
+          if (zonesOverlap(zones[index], zones[otherIndex])) {
+            overlapPairs.push(`${zones[index].name} / ${zones[otherIndex].name}`);
+          }
+        }
+      }
+
+      if (overlapPairs.length > 0) {
+        notes.push(`
+          <div class="notice warning">
+            <strong>Zones cibles en recouvrement.</strong>
+            ${overlapPairs.join(", ")}. Le moteur peut tout de meme proposer des cellules actives, mais les besoins ne
+            sont plus totalement distincts.
+          </div>
+        `);
+      }
+
+      if (designs.length === 0) {
+        notes.push(`
+          <div class="notice danger">
+            <strong>Aucune trame valide n'a ete trouvee.</strong>
+            L'outil a teste des maillages reguliers jusqu'a ${MAX_GRID_FANS} cellules, avec les regles BRASSE de FCC,
+            de distances et de hauteur.
+          </div>
+        `);
+      } else {
+        const bestDesign = designs[0];
+        notes.push(`
+          <div class="notice">
+            <strong>Couverture de l'option de tete.</strong>
+            La trame retenue mobilise <code>${bestDesign.fanCount}</code> cellule${bestDesign.fanCount > 1 ? "s" : ""}
+            pour couvrir <code>${formatSquareMeters(bestDesign.targetArea)}</code> de zones cibles, avec un debordement
+            de <code>${formatSquareMeters(bestDesign.spillArea)}</code> hors rectangles.
+          </div>
+        `);
+
+        if (bestDesign.mountMode.id === "low-profile") {
+          notes.push(`
+            <div class="notice warning">
+              <strong>La meilleure variante passe en low-profile.</strong>
+              Le guide annonce alors une baisse de vitesse d'air d'environ 15 % par rapport au montage standard.
+            </div>
+          `);
+        }
+      }
+
+      statusNote.innerHTML = notes.join("");
+    }
+
+    function renderVariabilityResults(designs) {
+      const tagsByKey = new Map();
+
+      if (designs[0]) {
+        tagsByKey.set(designs[0].key, [createBadge("Couverture prioritaire")]);
+      }
+
+      const standardDesign = designs.find((design) => design.mountMode.id === "standard");
+      if (standardDesign) {
+        const tags = tagsByKey.get(standardDesign.key) || [];
+        tags.push(createBadge("Meilleur standard"));
+        tagsByKey.set(standardDesign.key, tags);
+      }
+
+      const lowestFanCount = designs[0]
+        ? [...designs].sort((a, b) => a.fanCount - b.fanCount || compareVariabilityDesigns(a, b))[0]
+        : null;
+      if (lowestFanCount) {
+        const tags = tagsByKey.get(lowestFanCount.key) || [];
+        tags.push(createBadge("Moins de brasseurs"));
+        tagsByKey.set(lowestFanCount.key, tags);
+      }
+
+      resultsList.innerHTML = designs.slice(0, 5).map((design, index) => variabilityCard(
+        design,
+        index + 1,
+        tagsByKey.get(design.key) || []
+      )).join("");
+    }
+
+    function validateInputs(values) {
+      const issues = [];
+      if (!(values.length > 0)) {
+        issues.push("La longueur doit etre strictement positive.");
+      }
+      if (!(values.width > 0)) {
+        issues.push("La largeur doit etre strictement positive.");
+      }
+      if (!(values.height > 0)) {
+        issues.push("La hauteur sous plafond doit etre strictement positive.");
+      }
+      if (!allowStandardInput.checked && !allowLowInput.checked) {
+        issues.push("Selectionnez au moins un type de montage.");
+      }
+      return issues;
+    }
+
+    function toggleStrategyUI() {
+      const isVariability = strategyInput.value === "variabilite";
+      variabilityNote.classList.toggle("hidden", !isVariability);
+      zonesConfig.classList.toggle("hidden", !isVariability);
+      if (isVariability) {
+        renderZonesEditor();
+      }
+    }
+
+    function render() {
+      toggleStrategyUI();
+
+      const rawValues = {
+        strategy: strategyInput.value,
+        length: parseNumber(lengthInput),
+        width: parseNumber(widthInput),
+        height: parseNumber(heightInput)
+      };
+
+      const issues = validateInputs(rawValues);
+      const generatedAt = new Date();
+      emptyState.classList.add("hidden");
+      resultsContent.classList.add("hidden");
+      setExportAvailability(false);
+      latestReportState = null;
+
+      if (issues.length > 0) {
+        refreshReportHeader({
+          strategy: rawValues.strategy,
+          room: {
+            length: rawValues.length,
+            width: rawValues.width,
+            height: rawValues.height
+          },
+          recommendation: "Calcul impossible",
+          generatedAt
+        });
+        latestReportState = {
+          kind: "invalid",
+          strategy: rawValues.strategy,
+          simulationName: getSimulationName(),
+          room: {
+            length: rawValues.length,
+            width: rawValues.width,
+            height: rawValues.height
+          },
+          modesLabel: getSelectedModesLabel(),
+          generatedAt,
+          context: "Calcul impossible",
+          issues
+        };
+        statusNote.innerHTML = `
+          <div class="notice danger">
+            <strong>Calcul impossible.</strong><br>
+            ${issues.join(" ")}
+          </div>
+        `;
+        summaryGrid.innerHTML = "";
+        highlights.innerHTML = "";
+        resultsList.innerHTML = "";
+        resultsContent.classList.remove("hidden");
+        return;
+      }
+
+      if (rawValues.strategy === "variabilite") {
+        const room = {
+          length: rawValues.length,
+          width: rawValues.width,
+          height: rawValues.height
+        };
+        const { zones, issues: zoneIssues } = parseZoneDrafts(room);
+
+        if (zoneIssues.length > 0) {
+          refreshReportHeader({
+            strategy: rawValues.strategy,
+            room,
+            recommendation: "Zones invalides",
+            generatedAt
+          });
+          latestReportState = {
+            kind: "variability-empty",
+            strategy: rawValues.strategy,
+            simulationName: getSimulationName(),
+            room,
+            zones,
+            modesLabel: getSelectedModesLabel(),
+            generatedAt,
+            context: "Zones invalides",
+            issues: zoneIssues
+          };
+          summaryGrid.innerHTML = [
+            createSummaryCard("Strategie", "Zones a couvrir", "Corrigez les rectangles cibles"),
+            createSummaryCard("Local", `${formatMeters(room.length)} × ${formatMeters(room.width)}`, `HSP ${formatMeters(room.height)}`),
+            createSummaryCard("Zones", `${zones.length}`, "Chaque rectangle doit rester dans le local"),
+            createSummaryCard("Resultat", "Calcul bloque", "Impossible d'evaluer les zones a couvrir")
+          ].join("");
+          highlights.innerHTML = "";
+          statusNote.innerHTML = `
+            <div class="notice danger">
+              <strong>Zones invalides.</strong>
+              ${zoneIssues.join(" ")}
+            </div>
+          `;
+          resultsList.innerHTML = "";
+          resultsContent.classList.remove("hidden");
+          return;
+        }
+
+        const designs = enumerateVariabilityDesigns(room, zones, getSelectedModes(), MAX_GRID_FANS);
+        refreshReportHeader({
+          strategy: rawValues.strategy,
+          room,
+          recommendation: designs[0]
+            ? `Option recommandee : ${designs[0].fanCount} brasseur${designs[0].fanCount > 1 ? "s" : ""} sur ${designs[0].nx} × ${designs[0].ny}`
+            : "Aucune trame valide",
+          generatedAt
+        });
+        latestReportState = designs.length > 0
+          ? {
+            kind: "variability-ok",
+            strategy: rawValues.strategy,
+            simulationName: getSimulationName(),
+            room,
+            zones,
+            designs: designs.slice(0, 3),
+            modesLabel: getSelectedModesLabel(),
+            generatedAt,
+            context: designs[0]
+              ? `Zones a couvrir • option recommandee : ${designs[0].fanCount} brasseur${designs[0].fanCount > 1 ? "s" : ""} sur ${designs[0].nx} × ${designs[0].ny}`
+              : "Zones a couvrir"
+          }
+          : {
+            kind: "variability-empty",
+            strategy: rawValues.strategy,
+            simulationName: getSimulationName(),
+            room,
+            zones,
+            modesLabel: getSelectedModesLabel(),
+            generatedAt,
+            context: "Aucune trame valide",
+            issues: ["Aucune trame reguliere n'a respecte les regles BRASSE avec les rectangles saisis."]
+          };
+        renderVariabilitySummary(room, zones, designs);
+        renderVariabilityStatusNote(zones, designs);
+        renderVariabilityResults(designs);
+        setExportAvailability(true);
+        resultsContent.classList.remove("hidden");
+        return;
+      }
+
+      const room = {
+        length: rawValues.length,
+        width: rawValues.width,
+        height: rawValues.height
+      };
+      const modes = getSelectedModes();
+      const candidates = enumerateCandidates(room, MAX_GRID_FANS, modes);
+      const fallbackFlush = candidates.length === 0 ? getFallbackFlushCandidate(room, MAX_GRID_FANS) : null;
+
+      if (candidates.length === 0) {
+        refreshReportHeader({
+          strategy: rawValues.strategy,
+          room,
+          recommendation: "Aucune solution compatible",
+          generatedAt
+        });
+        latestReportState = {
+          kind: "uniformity-empty",
+          strategy: rawValues.strategy,
+          simulationName: getSimulationName(),
+          room,
+          modesLabel: getSelectedModesLabel(),
+          generatedAt,
+          context: "Aucune solution compatible",
+          fallbackFlush
+        };
+        summaryGrid.innerHTML = [
+          createSummaryCard("Local", `${formatMeters(room.length)} × ${formatMeters(room.width)}`, `HSP ${formatMeters(room.height)}`),
+          createSummaryCard("Resultat", "Aucune solution", "Aucun cas standard ou low-profile compatible"),
+          createSummaryCard("Montages etudies", modes.map((mode) => mode.label).join(" + "), `Diametres reels testes: ${formatDiameterList(REAL_DIAMETERS)}`),
+          createSummaryCard("Base BRASSE II", `${brasse2Models.length} modeles integres`, "Sans effet ici tant que la geometrie bloque")
+        ].join("");
+        highlights.innerHTML = "";
+        renderStatusNote(room, [], fallbackFlush);
+        resultsList.innerHTML = "";
+        setExportAvailability(true);
+        resultsContent.classList.remove("hidden");
+        return;
+      }
+
+      refreshReportHeader({
+        strategy: rawValues.strategy,
+        room,
+        recommendation: `Option recommandee : ${candidates[0].nx} × ${candidates[0].ny} - ${candidates[0].fanCount} brasseur${candidates[0].fanCount > 1 ? "s" : ""}`,
+        generatedAt
+      });
+      latestReportState = {
+        kind: "uniformity-ok",
+        strategy: rawValues.strategy,
+        simulationName: getSimulationName(),
+        room,
+        candidates: candidates.slice(0, 3),
+        modesLabel: getSelectedModesLabel(),
+        generatedAt,
+        context: `Recherche d'uniformite • option recommandee : ${candidates[0].nx} × ${candidates[0].ny}`
+      };
+      renderSummary(room, candidates);
+      renderStatusNote(room, candidates, fallbackFlush);
+      renderResults(candidates);
+      setExportAvailability(true);
+      resultsContent.classList.remove("hidden");
+    }
+
+    refreshReportHeader({
+      strategy: strategyInput.value,
+      room: {
+        length: parseNumber(lengthInput),
+        width: parseNumber(widthInput),
+        height: parseNumber(heightInput)
+      }
+    });
+    setExportAvailability(false);
+    initializeCatalogFilters();
+    renderCatalog();
+    toggleStrategyUI();
+    render();
+  </script>
+</body>
+</html>

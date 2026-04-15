@@ -61,22 +61,8 @@
       box-shadow: var(--shadow);
     }
 
-    .eyebrow {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 4px 8px;
-      border-radius: 999px;
-      background: var(--accent-soft);
-      color: var(--accent);
-      font-size: 0.74rem;
-      font-weight: 700;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-    }
-
     h1 {
-      margin: 8px 0 4px;
+      margin: 0 0 8px;
       font-size: clamp(1.4rem, 2vw, 1.9rem);
       line-height: 1.15;
       letter-spacing: -0.02em;
@@ -85,9 +71,103 @@
 
     .hero p {
       margin: 0;
-      max-width: 78ch;
+      max-width: 90ch;
       color: var(--muted);
       font-size: 0.88rem;
+    }
+
+    .method-panel {
+      overflow: hidden;
+    }
+
+    .method-summary {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 16px 18px;
+      cursor: pointer;
+      font-size: 0.98rem;
+      font-weight: 700;
+      list-style: none;
+    }
+
+    .method-summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .method-summary::after {
+      content: "+";
+      color: var(--muted);
+      font-size: 1.15rem;
+      line-height: 1;
+      flex: 0 0 auto;
+    }
+
+    .method-panel[open] .method-summary::after {
+      content: "−";
+    }
+
+    .method-content {
+      display: grid;
+      gap: 14px;
+      padding-top: 0;
+      border-top: 1px solid var(--line);
+    }
+
+    .source-line {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+
+    .source-line a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    .source-line a:hover {
+      text-decoration: underline;
+    }
+
+    .method-table-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+    }
+
+    .method-table {
+      width: 100%;
+      min-width: 860px;
+      border-collapse: collapse;
+    }
+
+    .method-table th,
+    .method-table td {
+      padding: 10px 12px;
+      border-bottom: 1px solid rgba(29, 47, 44, 0.08);
+      text-align: left;
+      vertical-align: top;
+      font-size: 0.88rem;
+    }
+
+    .method-table th {
+      width: 22%;
+      background: #f9fafb;
+      color: var(--ink);
+      font-size: 0.82rem;
+    }
+
+    .method-table td:last-child {
+      width: 18%;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .method-table tr:last-child th,
+    .method-table tr:last-child td {
+      border-bottom: 0;
     }
 
     .layout {
@@ -103,6 +183,10 @@
       border-radius: var(--radius);
       box-shadow: var(--shadow);
       overflow: hidden;
+    }
+
+    aside.panel {
+      overflow: visible;
     }
 
     .panel-body {
@@ -141,6 +225,76 @@
       font-size: 0.92rem;
       font-weight: 700;
       color: var(--ink);
+    }
+
+    .label-with-help {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .help-wrap {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+    }
+
+    .help-button {
+      width: 22px;
+      height: 22px;
+      padding: 0;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #fff;
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .help-button:hover,
+    .help-button:focus-visible {
+      border-color: var(--accent);
+      color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(31, 79, 130, 0.12);
+      outline: none;
+    }
+
+    .help-tooltip {
+      position: absolute;
+      top: calc(100% + 8px);
+      left: 0;
+      z-index: 20;
+      width: min(360px, calc(100vw - 32px));
+      max-width: calc(100vw - 32px);
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+      color: var(--muted);
+      font-size: 0.85rem;
+      line-height: 1.45;
+      box-shadow: var(--shadow);
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(-4px);
+      transition: opacity 120ms ease, transform 120ms ease, visibility 120ms ease;
+    }
+
+    .help-tooltip strong {
+      display: block;
+      margin: 0 0 4px;
+      color: var(--ink);
+      font-size: 0.85rem;
+      letter-spacing: normal;
+      text-transform: none;
+    }
+
+    .help-wrap:hover .help-tooltip,
+    .help-wrap:focus-within .help-tooltip {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0);
     }
 
     input,
@@ -400,35 +554,6 @@
       font-size: 0.92rem;
     }
 
-    .badge-row {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-
-    .badge {
-      display: inline-flex;
-      align-items: center;
-      border-radius: 999px;
-      padding: 5px 10px;
-      font-size: 0.8rem;
-      font-weight: 600;
-      letter-spacing: 0.02em;
-      background: #f3f4f6;
-      color: #374151;
-      border: 1px solid var(--line);
-    }
-
-    .badge.warn {
-      background: var(--amber-soft);
-      color: var(--amber);
-    }
-
-    .badge.alert {
-      background: var(--danger-soft);
-      color: var(--danger);
-    }
-
     .result-grid {
       display: grid;
       gap: 12px;
@@ -647,35 +772,6 @@
       font-size: 0.92rem;
     }
 
-    .rules {
-      display: grid;
-      gap: 12px;
-      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    }
-
-    .rule-card {
-      padding: 16px;
-      border-radius: 10px;
-      background: #fff;
-      border: 1px solid var(--line);
-    }
-
-    .rule-card h3 {
-      margin: 0 0 8px;
-      font-size: 0.98rem;
-    }
-
-    .rule-card p,
-    .rule-card ul {
-      margin: 0;
-      color: var(--muted);
-      font-size: 0.9rem;
-    }
-
-    .rule-card ul {
-      padding-left: 18px;
-    }
-
     .models-shell {
       display: grid;
       gap: 12px;
@@ -845,12 +941,6 @@
       display: none !important;
     }
 
-    .footer-note {
-      margin-top: 14px;
-      color: var(--muted);
-      font-size: 0.86rem;
-    }
-
     .site-footer {
       margin-top: 18px;
     }
@@ -884,6 +974,16 @@
       color: var(--muted);
     }
 
+    .static-panel {
+      margin-top: 18px;
+    }
+
+    .static-panel p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
     @media (max-width: 980px) {
       .layout,
       .result-grid {
@@ -899,6 +999,10 @@
       .metric-grid,
       .models-grid {
         grid-template-columns: 1fr;
+      }
+
+      .method-table {
+        min-width: 0;
       }
     }
 
@@ -919,9 +1023,8 @@
 
       .hero,
       aside.panel,
-      #variability-note,
       .catalog-panel,
-      .rules-panel,
+      .static-panel,
       .site-footer,
       .report-actions {
         display: none !important;
@@ -986,28 +1089,125 @@
   <div class="page">
     <section class="hero">
       <div class="hero-card">
-        <span class="eyebrow">Référentiel BRASSE</span>
-        <h1>Outil de calepinage brasseurs d'air</h1>
+        <h1>Calepinage de brasseurs d'air</h1>
         <p>
-          Calcul d'implantations conformes au guide BRASSE de l'ADEME à partir des dimensions du local et de la hauteur sous
-          plafond, avec selection des diametres et modeles issus de BRASSE II. Plus d'info sur le projet <a href="https://librairie.ademe.fr/energies/6791-brasse.html">BRASSE</a>
+          Ce site permet de faire rapidement un calepinage de brasseurs d'air et de repérer des modèles en se basant sur les guides BRASSE de l'ADEME. Il s'agit d'un projet personnel, sans lien officiel avec
+          l'ADEME.
         </p>
       </div>
+
+      <details class="panel method-panel">
+        <summary class="method-summary">Règles de calcul utilisées</summary>
+        <div class="panel-body method-content">
+          <p class="source-line">
+            Source principale :
+            <a href="https://librairie.ademe.fr/energies/6791-brasse.html" target="_blank" rel="noreferrer">guide BRASSE V1.0 - octobre 2023</a>.
+            Les pages citées ci-dessous correspondent aux numéros visibles dans le dossier PDF (<code>x/12</code>).
+          </p>
+
+          <div class="method-table-wrap">
+            <table class="method-table">
+              <tbody>
+                <tr>
+                  <th>Stratégie de départ</th>
+                  <td>Le site reprend la question d'entrée du guide : recherche d'uniformité dans tout le local, ou besoin de rafraîchir des zones de façon différenciée selon l'usage.</td>
+                  <td>Guide BRASSE, p. 4/12</td>
+                </tr>
+                <tr>
+                  <th>Diamètre à rechercher</th>
+                  <td>Le diamètre du brasseur doit être le plus grand possible ; c'est le premier critère d'aide à la décision repris dans le moteur.</td>
+                  <td>Guide BRASSE, p. 5/12, règle n°1</td>
+                </tr>
+                <tr>
+                  <th>Symétrie</th>
+                  <td>Les brasseurs sont centrés dans la pièce ou au centre de cellules de mêmes dimensions pour garder une implantation la plus symétrique possible.</td>
+                  <td>Guide BRASSE, p. 5/12, règle n°2</td>
+                </tr>
+                <tr>
+                  <th>Découpage et facteur de forme</th>
+                  <td>Si un seul brasseur ne suffit pas, la pièce est découpée en cellules de mêmes dimensions. Le site calcule le facteur de forme comme <code>grand côté / petit côté</code> pour avoir un FF toujours supérieur ou égal à 1, puis cherche des cellules dont le FF se rapproche au maximum de 1.</td>
+                  <td>Guide BRASSE, p. 5/12, règle n°3</td>
+                </tr>
+                <tr>
+                  <th>Facteur de couverture de cellule (FCC)</th>
+                  <td>Le site retient seulement les cas où <code>0,2 ≤ FCC ≤ 0,4</code>. La relation appliquée est <code>FCC = D / √(surface de cellule)</code>, cohérente avec l'exemple chiffré du guide et utilisée ensuite avec le diamètre réel retenu.</td>
+                  <td>Guide BRASSE, p. 5/12, règle n°4 et p. 9/12 à 11/12</td>
+                </tr>
+                <tr>
+                  <th>Distance centre-mur</th>
+                  <td>La distance entre le centre du brasseur et le mur le plus proche doit rester supérieure au diamètre du brasseur.</td>
+                  <td>Guide BRASSE, p. 6/12, règle n°5</td>
+                </tr>
+                <tr>
+                  <th>Distance entre brasseurs</th>
+                  <td>La distance entre les centres de deux brasseurs adjacents doit rester supérieure à <code>2,5 D</code>.</td>
+                  <td>Guide BRASSE, p. 6/12, règle n°6</td>
+                </tr>
+                <tr>
+                  <th>Distance plafond-pales</th>
+                  <td>Le site vérifie un montage standard au-dessus de <code>0,35 D</code>, accepte un montage low-profile jusqu'à <code>0,25 D</code> avec une baisse d'environ 15 %, et considère le flush à <code>0,15 D</code> comme un cas dégradé à éviter.</td>
+                  <td>Guide BRASSE, p. 7/12, règle n°7</td>
+                </tr>
+                <tr>
+                  <th>Hauteur sous pales</th>
+                  <td>Pour les petits brasseurs (<code>D &lt; 2,13 m</code>), le site vérifie la sécurité au-dessus de <code>2,13 m</code>, signale la recommandation d'aisance au-dessus de <code>1,4 D</code>, et garde la référence de performance <code>&lt; 2 D</code>. Pour les grands brasseurs, il applique le minimum de sécurité à <code>3,05 m</code> et la plage optimale entre <code>0,8 D</code> et <code>2 D</code>.</td>
+                  <td>Guide BRASSE, p. 8/12, règle n°8</td>
+                </tr>
+                <tr>
+                  <th>Hauteur sous plafond insuffisante</th>
+                  <td>Si la hauteur disponible ne permet plus de respecter les contraintes précédentes, le site réduit le diamètre maximal théorique jusqu'à retrouver un cas compatible.</td>
+                  <td>Guide BRASSE, p. 10/12 à 11/12</td>
+                </tr>
+                <tr>
+                  <th>Passage au diamètre marché</th>
+                  <td>Une fois le diamètre théorique maximal trouvé, le site retient un diamètre réel BRASSE II proche mais inférieur, puis recalcule le FCC réel avec ce diamètre réel.</td>
+                  <td>Guide BRASSE, p. 11/12</td>
+                </tr>
+                <tr>
+                  <th>Choix des modèles</th>
+                  <td>Les modèles compatibles sont lus à partir de la base BRASSE II embarquée. Le site affiche ensuite les indicateurs du guide pour comparer les modèles : <code>CEstandard</code>, <code>CFEstandard</code> et <code>LwA</code>.</td>
+                  <td>Guide BRASSE, p. 12/12</td>
+                </tr>
+                <tr>
+                  <th>Départages propres au site</th>
+                  <td>En mode uniformité, après validation BRASSE, le site classe les options par diamètre réel retenu le plus grand, puis par facteur de forme le plus proche de 1, puis par FCC réel le plus proche de 0,4. À égalité, le montage standard est privilégié. En mode zones, le classement supplémentaire sur le débordement et le nombre de brasseurs est propre au site.</td>
+                  <td>Ordre BRASSE : p. 5/12 et p. 11/12 ; départages complémentaires propres au site</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="notice warning">
+            <strong>Mode zone à couvrir</strong>
+            Le guide BRASSE distingue bien le besoin d'uniformité et le besoin de variabilité, mais ne donne pas de
+            procédure géométrique complète pour redécouper automatiquement des rectangles cibles. Dans ce mode, le site
+            génère donc une trame régulière propre au site, puis applique les contrôles BRASSE sur le diamètre, le FCC,
+            les distances, le montage et la hauteur.
+          </div>
+        </div>
+      </details>
     </section>
 
     <div class="layout">
       <aside class="panel">
         <div class="panel-body">
-          <h2 class="section-title">Données de la pièce à équiper</h2>
-          <p class="section-subtitle">
-            Le calcul "Recherche d'uniformité" vise l'uniformité dans toute la pièce, comme dans la procedure BRASSE. Le mode
-            "zones a couvrir" permet de definir des rectangles cibles à couvrir puis de laisser le moteur proposer une
-            trame de cellules et le nombre de brasseurs associé.
-          </p>
+          <h2 class="section-title">Données du local</h2>
 
           <form id="calculator-form">
             <div class="field">
-              <label for="strategy">Strategie</label>
+              <div class="label-with-help">
+                <label for="strategy">Strategie</label>
+                <div class="help-wrap">
+                  <button class="help-button" type="button" aria-label="Aide sur la stratégie">?</button>
+                  <div class="help-tooltip" role="tooltip">
+                    <strong>Recherche d'uniformité</strong>
+                    Le site cherche une implantation régulière pour obtenir une vitesse d'air la plus uniforme possible dans tout le local.
+                    <br><br>
+                    <strong>Zones à couvrir</strong>
+                    Le site part de rectangles cibles déterminés par l'utilisateur, puis applique les règles BRASSE à ces zones. Il ne s'agit pas d'une mode opératoire décrit dans le guide BRASSE.
+                  </div>
+                </div>
+              </div>
               <select id="strategy" name="strategy">
                 <option value="uniformite">Recherche d'uniformite</option>
                 <option value="variabilite">Zones à couvrir</option>
@@ -1073,19 +1273,6 @@
       </aside>
 
       <main class="results-shell">
-        <section id="variability-note" class="panel hidden">
-          <div class="panel-body">
-            <h2 class="section-title">Cas "zones à couvrir"</h2>
-            <div class="notice warning">
-              <strong>Le guide BRASSE ne donne pas de calepinage geometrique unique pour ce cas.</strong><br>
-              Cette version traite les rectangles comme des zones à couvrir, puis explore des trames regulieres
-              ancrées au local. Les cellules qui intersectent les zones sont activees, ensuite les contraintes BRASSE
-              de FCC, de murs, d'espacement, de montage et de hauteur sont vérifiées avant de comparer les modèles
-              BRASSE II.
-            </div>
-          </div>
-        </section>
-
         <section class="panel results-panel">
           <div class="panel-body">
             <div id="empty-state" class="empty">
@@ -1095,7 +1282,7 @@
             <div id="results-content" class="hidden">
               <div class="report-head">
                 <div>
-                  <p class="report-kicker">Rapport de simulation</p>
+                  <p id="report-kicker" class="report-kicker">Rapport de simulation</p>
                   <h2 id="report-title" class="report-title">Simulation sans nom</h2>
                   <p id="report-context" class="report-context">Renseignez le local et lancez un calcul.</p>
                 </div>
@@ -1169,70 +1356,22 @@
             <div id="catalog-table-host"></div>
           </div>
         </section>
-
-        <section class="panel rules-panel">
-          <div class="panel-body">
-            <h2 class="section-title">Rappels BRASSE repris dans l'outil</h2>
-            <div class="rules">
-              <article class="rule-card">
-                <h3>Decoupage et symetrie</h3>
-                <p>
-                  Les brasseurs sont centres dans la piece ou dans des cellules egales. L'outil explore des maillages
-                  reguliers pour conserver cette symetrie.
-                </p>
-              </article>
-
-              <article class="rule-card">
-                <h3>Facteur de forme</h3>
-                <p>
-                  Le facteur de forme est calcule comme <code>max(longueur, largeur) / min(longueur, largeur)</code>.
-                  Plus il se rapproche de <code>1</code>, plus l'uniformite est favorable.
-                </p>
-              </article>
-
-              <article class="rule-card">
-                <h3>Facteur de couverture</h3>
-                <p>
-                  Le FCC est maintenu entre <code>0,2</code> et <code>0,4</code>. Dans cette interface, il est calcule
-                  comme <code>D / racine(surface de cellule)</code>, formule reconstituee a partir de l'exemple chiffre
-                  du guide.
-                </p>
-              </article>
-
-              <article class="rule-card">
-                <h3>Distances de pose</h3>
-                <ul>
-                  <li>Centre vers mur superieur au diametre.</li>
-                  <li>Centre a centre entre deux brasseurs adjacents superieur a <code>2,5 D</code>.</li>
-                  <li>Plafond vers plan des pales superieur a <code>0,35 D</code> en standard, possible jusqu'a <code>0,25 D</code> en low-profile.</li>
-                </ul>
-              </article>
-
-              <article class="rule-card">
-                <h3>Hauteur sous pales</h3>
-                <ul>
-                  <li>Petits brasseurs (<code>D &lt; 2,13 m</code>) : securite au-dessus de <code>2,13 m</code>, recommandation d'aisance au-dessus de <code>1,4 D</code>, et vitesse optimale sous <code>2 D</code>.</li>
-                  <li>Grands brasseurs (<code>D &gt;= 2,13 m</code>) : securite au-dessus de <code>3,05 m</code> et plage optimale entre <code>0,8 D</code> et <code>2 D</code>.</li>
-                </ul>
-              </article>
-
-              <article class="rule-card">
-                <h3>Base BRASSE II</h3>
-                <p style="margin-top:8px;">
-                  Les modeles de la base BRASSE II sont compares avec les indicateurs BRASSE d'effet rafraichissant, d'efficacite et de
-                  puissance acoustique.
-                </p>
-              </article>
-            </div>
-          </div>
-        </section>
       </main>
     </div>
 
+    <section class="panel static-panel">
+      <div class="panel-body">
+        <h2 class="section-title">Fonctionnement du site</h2>
+        <p>
+          Ce site est un site statique. Il n'intègre pas de base de données, ne stocke pas vos saisies, et les calculs
+          sont réalisés directement dans le navigateur. Il a été réalisé avec l'aide de l'IA.
+        </p>
+      </div>
+    </section>
+
     <footer class="site-footer">
       <div class="site-footer-card">
-        Fait par Nathan Chateau,
-        <a href="mailto:chateaunathan@proton.me">chateaunathan@proton.me</a>,
+        Fait par Nathan Château, <a href="mailto:chateaunathan@proton.me">chateaunathan@proton.me</a>
       </div>
     </footer>
   </div>
@@ -1293,13 +1432,13 @@
     const allowLowInput = document.getElementById("allow-low");
     const resetButton = document.getElementById("reset-button");
 
-    const variabilityNote = document.getElementById("variability-note");
     const emptyState = document.getElementById("empty-state");
     const resultsContent = document.getElementById("results-content");
     const summaryGrid = document.getElementById("summary-grid");
     const highlights = document.getElementById("highlights");
     const statusNote = document.getElementById("status-note");
     const resultsList = document.getElementById("results-list");
+    const reportKicker = document.getElementById("report-kicker");
     const reportTitle = document.getElementById("report-title");
     const reportContext = document.getElementById("report-context");
     const reportMeta = document.getElementById("report-meta");
@@ -1714,6 +1853,42 @@
       return labels.length > 0 ? labels.join(" + ") : "Aucun";
     }
 
+    function getMaxRealDiameter() {
+      return REAL_DIAMETERS.length > 0 ? REAL_DIAMETERS[REAL_DIAMETERS.length - 1] : null;
+    }
+
+    function joinWithOr(values) {
+      if (values.length <= 1) {
+        return values[0] || "";
+      }
+      if (values.length === 2) {
+        return `${values[0]} ou ${values[1]}`;
+      }
+      return `${values.slice(0, -1).join(", ")} ou ${values[values.length - 1]}`;
+    }
+
+    function buildHeightDiameterRequirementMessage(room, modes = getSelectedModes()) {
+      const maxRealDiameter = getMaxRealDiameter();
+      if (!room || !Number.isFinite(room.height) || !Number.isFinite(maxRealDiameter) || modes.length === 0) {
+        return "";
+      }
+
+      const blockedModes = modes.map((mode) => ({
+        mode,
+        minimumDiameter: room.height / (2 + mode.factor)
+      })).filter((entry) => entry.minimumDiameter > maxRealDiameter + EPS);
+
+      if (blockedModes.length === 0) {
+        return "";
+      }
+
+      const requiredText = joinWithOr(blockedModes.map((entry) =>
+        `${formatMeters(entry.minimumDiameter)} en ${entry.mode.label.toLowerCase()}`
+      ));
+
+      return `La base BRASSE II embarquee s'arrete à ${formatDiameterCm(maxRealDiameter)} cm. Avec ${formatMeters(room.height)} de HSP, il faudrait ici en theorie au moins ${requiredText}.`;
+    }
+
     function compareCatalogIdentity(a, b) {
       const brandDiff = String(a.brand).localeCompare(String(b.brand), "fr", { sensitivity: "base" });
       if (brandDiff !== 0) {
@@ -1904,13 +2079,15 @@
     }
 
     function refreshReportHeader({ strategy, room, recommendation = "", generatedAt = new Date() }) {
+      reportKicker.textContent = `Rapport de simulation • le ${formatDateTime(generatedAt)}`;
       reportTitle.textContent = getSimulationName();
-      reportContext.textContent = `${getStrategyLabel(strategy)}${recommendation ? ` • ${recommendation}` : ""}`;
+      reportContext.textContent = [
+        getStrategyLabel(strategy),
+        recommendation,
+        getSelectedModesLabel()
+      ].filter(Boolean).join(" • ");
 
       const metaItems = [];
-      metaItems.push(["Strategie", getStrategyLabel(strategy)]);
-      metaItems.push(["Montages etudies", getSelectedModesLabel()]);
-      metaItems.push(["Genere le", formatDateTime(generatedAt)]);
 
       reportMeta.innerHTML = metaItems.map(([label, value]) => `
         <article class="report-meta-card">
@@ -1918,6 +2095,7 @@
           <span>${escapeHtml(value)}</span>
         </article>
       `).join("");
+      reportMeta.classList.toggle("hidden", metaItems.length === 0);
     }
 
     function setExportAvailability(enabled) {
@@ -1927,7 +2105,7 @@
     function getCandidateWarnings(candidate) {
       const warnings = [];
       if (!candidate.recommendedSmallHeightMet && candidate.fanClass === "small") {
-        warnings.push("La recommandation d'aisance > 1,4 D n'est pas atteinte.");
+        warnings.push("La recommandation d'aisance sur la hauteur sous pales (> 1,4 D) n'est pas atteinte.");
       }
       if (candidate.mountMode.id === "low-profile") {
         warnings.push(candidate.mountMode.penaltyText);
@@ -1938,7 +2116,7 @@
     function getVariabilityWarnings(design) {
       const warnings = [];
       if (!design.recommendedSmallHeightMet && design.fanClass === "small") {
-        warnings.push("La recommandation d'aisance > 1,4 D n'est pas atteinte.");
+        warnings.push("La recommandation d'aisance sur la hauteur sous pales (> 1,4 D) n'est pas atteinte.");
       }
       if (design.mountMode.id === "low-profile") {
         warnings.push(design.mountMode.penaltyText);
@@ -2360,10 +2538,7 @@
       }
 
       const metaItems = [
-        ["Strategie", getStrategyLabel(state.strategy)],
-        ["Simulation", state.simulationName],
-        ["Montages etudies", state.modesLabel],
-        ["Genere le", formatDateTime(state.generatedAt)]
+        ["Simulation", state.simulationName]
       ];
 
       let bodyContent = "";
@@ -2400,6 +2575,14 @@
               <div class="report-note" style="margin-top:10px;">
                 <strong>Piste flush</strong>
                 <p>Un montage flush pourrait rouvrir une piste jusqu'a ${escapeHtml(formatMeters(state.fallbackFlush.diameter))}, avec la forte penalite de performance indiquee par le guide.</p>
+              </div>
+            ` : ""}
+            ${state.issues && state.issues.length > 0 ? `
+              <div class="report-note" style="margin-top:10px;">
+                <strong>Motifs releves</strong>
+                <ul>
+                  ${state.issues.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
+                </ul>
               </div>
             ` : ""}
           </section>
@@ -2468,22 +2651,23 @@
         <body>
           <main class="report-root">
             <header class="report-cover">
-              <p class="report-cover-kicker">Rapport BRASSE</p>
+              <p class="report-cover-kicker">Rapport BRASSE • le ${escapeHtml(formatDateTime(state.generatedAt))}</p>
               <h1>${escapeHtml(state.simulationName)}</h1>
-              <p>${escapeHtml(state.context)}</p>
-              <div class="report-meta-grid">
-                ${metaItems.map(([label, value]) => `
-                  <article class="report-meta-item">
-                    <strong>${escapeHtml(label)}</strong>
-                    <span>${escapeHtml(value)}</span>
-                  </article>
-                `).join("")}
-              </div>
+              <p>${escapeHtml([state.context, state.modesLabel].filter(Boolean).join(" • "))}</p>
+              ${metaItems.length > 0 ? `
+                <div class="report-meta-grid">
+                  ${metaItems.map(([label, value]) => `
+                    <article class="report-meta-item">
+                      <strong>${escapeHtml(label)}</strong>
+                      <span>${escapeHtml(value)}</span>
+                    </article>
+                  `).join("")}
+                </div>
+              ` : ""}
             </header>
             ${bodyContent}
             <footer class="report-footer">
-              <strong>Nathan Chateau</strong>, conseiller en energie partage au Service Public Intercommunal de l'Energie,
-              <a href="mailto:nchateau@cccps.fr">nchateau@cccps.fr</a>, CCCPS et CCVD.
+              Fait par Nathan Château, <a href="mailto:chateaunathan@proton.me">chateaunathan@proton.me</a>
             </footer>
           </main>
         </body>
@@ -2852,18 +3036,14 @@
     }
 
     function compareCandidates(a, b) {
-      const ffA = Math.abs(a.formFactor - 1);
-      const ffB = Math.abs(b.formFactor - 1);
-      if (Math.abs(ffA - ffB) > EPS) {
-        return ffA - ffB;
-      }
-
       if (Math.abs(b.diameter - a.diameter) > EPS) {
         return b.diameter - a.diameter;
       }
 
-      if (Math.abs(b.theoreticalMaxDiameter - a.theoreticalMaxDiameter) > EPS) {
-        return b.theoreticalMaxDiameter - a.theoreticalMaxDiameter;
+      const ffA = Math.abs(a.formFactor - 1);
+      const ffB = Math.abs(b.formFactor - 1);
+      if (Math.abs(ffA - ffB) > EPS) {
+        return ffA - ffB;
       }
 
       const covA = Math.abs(0.4 - a.coverageFactor);
@@ -2926,10 +3106,6 @@
           <div class="hint">${detail}</div>
         </article>
       `;
-    }
-
-    function createBadge(label, variant = "") {
-      return `<span class="badge${variant ? ` ${variant}` : ""}">${label}</span>`;
     }
 
     function svgLabelBox(x, y, label, anchor = "middle", fontSize = 10.5) {
@@ -3387,16 +3563,10 @@
       `;
     }
 
-    function candidateCard(candidate, rank, tags = []) {
-      const badges = [
-        createBadge(`${candidate.nx} × ${candidate.ny} cellules`),
-        createBadge(candidate.mountMode.label, candidate.mountMode.severity === "warn" ? "warn" : ""),
-        ...tags
-      ].join("");
-
+    function candidateCard(candidate, rank) {
       const warnings = [];
       if (!candidate.recommendedSmallHeightMet && candidate.fanClass === "small") {
-        warnings.push("La recommandation d'aisance > 1,4 D n'est pas atteinte.");
+        warnings.push("La recommandation d'aisance sur la hauteur sous pales (> 1,4 D) n'est pas atteinte.");
       }
       if (candidate.mountMode.id === "low-profile") {
         warnings.push(candidate.mountMode.penaltyText);
@@ -3410,10 +3580,9 @@
               <p class="result-subtitle">
                 ${candidate.fanCount} brasseur${candidate.fanCount > 1 ? "s" : ""} centre${candidate.fanCount > 1 ? "s" : ""}
                 dans des cellules de ${formatMeters(candidate.cellLength)} × ${formatMeters(candidate.cellWidth)},
-                avec un diametre BRASSE II retenu de ${formatMeters(candidate.diameter)}, proche mais inferieur au maximum theorique.
+                avec un diametre BRASSE II retenu de ${formatMeters(candidate.diameter)}.
               </p>
             </div>
-            <div class="badge-row">${badges}</div>
           </div>
 
           <div class="result-grid">
@@ -3505,7 +3674,7 @@
       summaryGrid.innerHTML = [
         createSummaryCard("Piece", `${formatMeters(room.length)} × ${formatMeters(room.width)}`, `${formatSquareMeters(roomArea)} - HSP ${formatMeters(room.height)}`),
         createSummaryCard("Recommandation uniformite", `${best.fanCount} brasseur${best.fanCount > 1 ? "s" : ""}`, `${best.nx} × ${best.ny} cellules - ${best.mountMode.label}`),
-        createSummaryCard("Diametre BRASSE II retenu", formatMeters(best.diameter), `Theorique max ${formatMeters(best.theoreticalMaxDiameter)} - FCC reel ${formatFactor(best.coverageFactor)}`),
+        createSummaryCard("Diametre réel retenu", formatMeters(best.diameter), `Theorique max ${formatMeters(best.theoreticalMaxDiameter)} - FCC reel ${formatFactor(best.coverageFactor)}`),
         createSummaryCard("Base BRASSE II", bestBrasse2Matches.length > 0 ? `${bestBrasse2Matches.length} modeles compatibles` : "Aucun modele compatible", "Selection sur CE, CFE et LwA a Vmax")
       ].join("");
 
@@ -3531,41 +3700,11 @@
     }
 
     function renderStatusNote(room, candidates, fallbackFlush) {
-      const roomFormFactor = Math.max(room.length, room.width) / Math.min(room.length, room.width);
       const notes = [];
+      const heightRequirementMessage = buildHeightDiameterRequirementMessage(room);
 
       if (candidates.length > 0) {
         const best = candidates[0];
-        notes.push(`
-          <div class="notice">
-            <strong>Lecture des résultats:</strong>
-            <ul style="margin:8px 0 0; padding-left:18px;">
-              <li>
-                <strong>Choix du calepinage:</strong> l'outil teste des trames regulieres sur tout le local et ne garde
-                que celles qui respectent les regles BRASSE de distances, de hauteur et de FCC. L'option 1 est celle
-                qui privilegie d'abord les cellules les plus equilibrées pour l'uniformite, puis le plus grand
-                diametre reel BRASSE II admissible.
-              </li>
-              <li>
-                <strong>Lecture du FCC reel:</strong> le FCC est recalcule avec le diametre reel retenu, pas avec le
-                diametre theorique. Entre <code>0,2</code> et <code>0,4</code>, le cas reste recevable. Plus le FCC reel
-                est proche de <code>0,2</code>, plus le diametre choisi est petit par rapport a la cellule. Plus il se
-                rapproche de <code>0,4</code>, plus la cellule est couverte.
-              </li>
-              <li>
-                <strong>Tri des brasseurs compatibles:</strong> seuls les modeles des diametres BRASSE II admissibles
-                sont proposes. Le tableau n'utilise pas de note globale entre <em>confort</em>, <em>efficacite</em> et
-                <em>acoustique</em>. Il affiche d'abord les modeles du diametre retenu, puis les autres diametres
-                compatibles du plus grand au plus petit, donc en pratique du <code>FCC reel</code> le plus fort vers le
-                plus faible. A diametre egal, le tri se fait ensuite sur le <em>confort</em> : meilleur <code>CE direct
-                debout</code>, puis plus faible <code>LwA</code>, puis plus faible puissance. Les cartes, elles,
-                montrent separement le meilleur modele en <em>FCC</em>, en <em>confort</em>, en <em>efficacite</em> et
-                en <em>acoustique</em>.
-              </li>
-            </ul>
-          </div>
-        `);
-
         if (best.mountMode.id === "low-profile") {
           notes.push(`
             <div class="notice warning">
@@ -3583,6 +3722,7 @@
             <strong>Aucune solution standard ou low-profile n'a ete trouvee.</strong>
             Un montage flush pourrait rouvrir une piste jusqu'a ${formatMeters(fallbackFlush.diameter)}, mais le guide
             annonce alors une perte de performance superieure a 40 % et demande de l'eviter au maximum.
+            ${heightRequirementMessage}
           </div>
         `);
       }
@@ -3590,9 +3730,10 @@
       if (!fallbackFlush && candidates.length === 0) {
         notes.push(`
           <div class="notice danger">
-            <strong>Aucun diametre reel de la liste testee ne passe dans ce local.</strong>
+            <strong>Aucun diametre réel de la liste testée ne passe dans ce local.</strong>
             L'outil a teste ${formatDiameterList(REAL_DIAMETERS)} avec les regles BRASSE
             de FCC, de distances et de hauteur.
+            ${heightRequirementMessage}
           </div>
         `);
       }
@@ -3601,38 +3742,8 @@
     }
 
     function renderResults(candidates) {
-      const biggest = uniqueBest([...candidates], (items) => {
-        return items.sort((a, b) => {
-          if (Math.abs(b.diameter - a.diameter) > EPS) {
-            return b.diameter - a.diameter;
-          }
-          return compareCandidates(a, b);
-        })[0];
-      });
-
-      const bestStandard = uniqueBest(
-        candidates.filter((candidate) => candidate.mountMode.id === "standard"),
-        (items) => items[0]
-      );
-
-      const tagged = new Map();
-      if (candidates[0]) {
-        tagged.set(candidates[0].key, [createBadge("Uniformite prioritaire")]);
-      }
-      if (biggest) {
-        const list = tagged.get(biggest.key) || [];
-        list.push(createBadge("Diametre maxi"));
-        tagged.set(biggest.key, list);
-      }
-      if (bestStandard) {
-        const list = tagged.get(bestStandard.key) || [];
-        list.push(createBadge("Meilleur standard"));
-        tagged.set(bestStandard.key, list);
-      }
-
       resultsList.innerHTML = candidates.slice(0, 5).map((candidate, index) => {
-        const tags = tagged.get(candidate.key) || [];
-        return candidateCard(candidate, index + 1, tags);
+        return candidateCard(candidate, index + 1);
       }).join("");
     }
 
@@ -3879,10 +3990,6 @@
         return b.diameter - a.diameter;
       }
 
-      if (Math.abs(b.theoreticalMaxDiameter - a.theoreticalMaxDiameter) > EPS) {
-        return b.theoreticalMaxDiameter - a.theoreticalMaxDiameter;
-      }
-
       return a.totalCells - b.totalCells;
     }
 
@@ -4120,17 +4227,11 @@
       `;
     }
 
-    function variabilityCard(design, rank, tags = []) {
-      const badges = [
-        createBadge(`${design.fanCount} brasseur${design.fanCount > 1 ? "s" : ""}`),
-        createBadge(`${design.nx} × ${design.ny} trame`),
-        createBadge(design.mountMode.label, design.mountMode.severity === "warn" ? "warn" : ""),
-        ...tags
-      ].join("");
+    function variabilityCard(design, rank) {
       const warnings = [];
 
       if (!design.recommendedSmallHeightMet && design.fanClass === "small") {
-        warnings.push("La recommandation d'aisance > 1,4 D n'est pas atteinte.");
+        warnings.push("La recommandation d'aisance sur la hauteur sous pales (> 1,4 D) n'est pas atteinte.");
       }
       if (design.mountMode.id === "low-profile") {
         warnings.push(design.mountMode.penaltyText);
@@ -4151,7 +4252,6 @@
                 ${design.nx} × ${design.ny}, avec des cellules de ${formatMeters(design.cellLength)} × ${formatMeters(design.cellWidth)}.
               </p>
             </div>
-            <div class="badge-row">${badges}</div>
           </div>
 
           <div class="result-grid">
@@ -4242,7 +4342,6 @@
 
     function renderVariabilitySummary(room, zones, designs) {
       const bestDesign = designs[0] || null;
-      const bestStandard = designs.find((design) => design.mountMode.id === "standard") || null;
       const lowestFanCount = designs[0]
         ? [...designs].sort((a, b) => a.fanCount - b.fanCount || compareVariabilityDesigns(a, b))[0]
         : null;
@@ -4257,15 +4356,7 @@
 
       const highlightCards = [];
 
-      if (bestStandard) {
-        highlightCards.push(createSummaryCard(
-          "Meilleur standard",
-          `${bestStandard.fanCount} brasseur${bestStandard.fanCount > 1 ? "s" : ""}`,
-          `${bestStandard.nx} × ${bestStandard.ny} - debordement ${formatSquareMeters(bestStandard.spillArea)}`
-        ));
-      }
-
-      if (lowestFanCount && (!bestStandard || lowestFanCount.key !== bestStandard.key)) {
+      if (lowestFanCount) {
         highlightCards.push(createSummaryCard(
           "Moins de brasseurs",
           `${lowestFanCount.fanCount}`,
@@ -4276,17 +4367,9 @@
       highlights.innerHTML = highlightCards.join("");
     }
 
-    function renderVariabilityStatusNote(zones, designs) {
-      const notes = [
-        `
-          <div class="notice">
-            <strong>Lecture du mode zones.</strong>
-            Le moteur explore ici des trames regulieres ancrees au local, puis active les cellules qui intersectent
-            les rectangles cibles. Ce redécoupage en cellules est une aide a la conception de l'outil, avec
-            verification BRASSE ensuite sur le FCC, les murs, les entraxes, le montage et la hauteur.
-          </div>
-        `
-      ];
+    function renderVariabilityStatusNote(room, zones, designs) {
+      const notes = [];
+      const heightRequirementMessage = buildHeightDiameterRequirementMessage(room);
 
       const overlapPairs = [];
       for (let index = 0; index < zones.length; index += 1) {
@@ -4313,6 +4396,7 @@
             <strong>Aucune trame valide n'a ete trouvee.</strong>
             L'outil a teste des maillages reguliers jusqu'a ${MAX_GRID_FANS} cellules, avec les regles BRASSE de FCC,
             de distances et de hauteur.
+            ${heightRequirementMessage}
           </div>
         `);
       } else {
@@ -4340,32 +4424,9 @@
     }
 
     function renderVariabilityResults(designs) {
-      const tagsByKey = new Map();
-
-      if (designs[0]) {
-        tagsByKey.set(designs[0].key, [createBadge("Couverture prioritaire")]);
-      }
-
-      const standardDesign = designs.find((design) => design.mountMode.id === "standard");
-      if (standardDesign) {
-        const tags = tagsByKey.get(standardDesign.key) || [];
-        tags.push(createBadge("Meilleur standard"));
-        tagsByKey.set(standardDesign.key, tags);
-      }
-
-      const lowestFanCount = designs[0]
-        ? [...designs].sort((a, b) => a.fanCount - b.fanCount || compareVariabilityDesigns(a, b))[0]
-        : null;
-      if (lowestFanCount) {
-        const tags = tagsByKey.get(lowestFanCount.key) || [];
-        tags.push(createBadge("Moins de brasseurs"));
-        tagsByKey.set(lowestFanCount.key, tags);
-      }
-
       resultsList.innerHTML = designs.slice(0, 5).map((design, index) => variabilityCard(
         design,
-        index + 1,
-        tagsByKey.get(design.key) || []
+        index + 1
       )).join("");
     }
 
@@ -4388,7 +4449,6 @@
 
     function toggleStrategyUI() {
       const isVariability = strategyInput.value === "variabilite";
-      variabilityNote.classList.toggle("hidden", !isVariability);
       zonesConfig.classList.toggle("hidden", !isVariability);
       if (isVariability) {
         renderZonesEditor();
@@ -4526,10 +4586,16 @@
             modesLabel: getSelectedModesLabel(),
             generatedAt,
             context: "Aucune trame valide",
-            issues: ["Aucune trame reguliere n'a respecte les regles BRASSE avec les rectangles saisis."]
+            issues: [
+              "Aucune trame reguliere n'a respecte les regles BRASSE avec les rectangles saisis.",
+              ...(() => {
+                const heightRequirementMessage = buildHeightDiameterRequirementMessage(room);
+                return heightRequirementMessage ? [heightRequirementMessage] : [];
+              })()
+            ]
           };
         renderVariabilitySummary(room, zones, designs);
-        renderVariabilityStatusNote(zones, designs);
+        renderVariabilityStatusNote(room, zones, designs);
         renderVariabilityResults(designs);
         setExportAvailability(true);
         resultsContent.classList.remove("hidden");
@@ -4560,12 +4626,18 @@
           modesLabel: getSelectedModesLabel(),
           generatedAt,
           context: "Aucune solution compatible",
-          fallbackFlush
+          fallbackFlush,
+          issues: [
+            "Aucun cas standard ou low-profile n'a respecte les regles BRASSE de FCC, de distances et de hauteur.",
+            ...(() => {
+              const heightRequirementMessage = buildHeightDiameterRequirementMessage(room);
+              return heightRequirementMessage ? [heightRequirementMessage] : [];
+            })()
+          ]
         };
         summaryGrid.innerHTML = [
           createSummaryCard("Local", `${formatMeters(room.length)} × ${formatMeters(room.width)}`, `HSP ${formatMeters(room.height)}`),
           createSummaryCard("Resultat", "Aucune solution", "Aucun cas standard ou low-profile compatible"),
-          createSummaryCard("Montages etudies", modes.map((mode) => mode.label).join(" + "), `Diametres reels testes: ${formatDiameterList(REAL_DIAMETERS)}`),
           createSummaryCard("Base BRASSE II", `${brasse2Models.length} modeles integres`, "Sans effet ici tant que la geometrie bloque")
         ].join("");
         highlights.innerHTML = "";

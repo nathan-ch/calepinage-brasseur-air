@@ -182,6 +182,53 @@ function renderModelCard(title, model) {
   `;
 }
 
+function formatCeilingShiftLabel(assessment) {
+  if (!assessment?.shiftApplied) {
+    return "Aucun decalage";
+  }
+
+  return `${formatNumber(assessment.dx * 100, 0)} cm / ${formatNumber(assessment.dy * 100, 0)} cm`;
+}
+
+function renderCeilingDetailItems(item) {
+  const assessment = item.ceilingAssessment;
+
+  if (!assessment?.enabled) {
+    return "";
+  }
+
+  return `
+    <div class="detail-item">
+      <strong>Compatibilite faux plafond</strong>
+      <span>${assessment.compatible ? "Compatible" : "Non compatible"}</span>
+    </div>
+    <div class="detail-item">
+      <strong>Decalage de trame</strong>
+      <span>${formatCeilingShiftLabel(assessment)}</span>
+    </div>
+    <div class="detail-item">
+      <strong>Conflit luminaire</strong>
+      <span>${assessment.luminaireConflict ? "Oui" : "Non"}</span>
+    </div>
+  `;
+}
+
+function renderCeilingNotice(item) {
+  const assessment = item.ceilingAssessment;
+
+  if (!assessment?.enabled) {
+    return "";
+  }
+
+  return `
+    <div class="notice ${assessment.compatible ? "warning" : "danger"}">
+      <strong>${assessment.compatible ? "Lecture faux plafond." : "Faux plafond non compatible."}</strong>
+      ${assessment.reasonText}
+      ${assessment.visualCheckNote ? ` ${assessment.visualCheckNote}` : ""}
+    </div>
+  `;
+}
+
 function renderModelsTable(models) {
   if (models.length === 0) {
     return `
@@ -436,6 +483,7 @@ function candidateCard(candidate, rank, brasse2Models, realDiameters, selectedOp
               <strong>Diametres BRASSE II admissibles (FCC &gt;= 0,2)</strong>
               <span>${candidate.compatibleRealDiameters.map((option) => formatDiameterCm(option.diameter)).join(", ")}</span>
             </div>
+            ${renderCeilingDetailItems(candidate)}
           </div>
         </div>
       </div>
@@ -446,6 +494,8 @@ function candidateCard(candidate, rank, brasse2Models, realDiameters, selectedOp
           ${warnings.join(" ")}
         </div>
       ` : ""}
+
+      ${renderCeilingNotice(candidate)}
 
       ${renderBrasse2Section(candidate, brasse2Models, realDiameters)}
 
@@ -656,6 +706,7 @@ function variabilityCard(design, rank, brasse2Models, realDiameters, selectedOpt
               <strong>Diametres BRASSE II admissibles (FCC &gt;= 0,2)</strong>
               <span>${formatDiameterCmList(design.compatibleRealDiameters)}</span>
             </div>
+            ${renderCeilingDetailItems(design)}
           </div>
         </div>
       </div>
@@ -666,6 +717,8 @@ function variabilityCard(design, rank, brasse2Models, realDiameters, selectedOpt
           ${warnings.join(" ")}
         </div>
       ` : ""}
+
+      ${renderCeilingNotice(design)}
 
       <div class="zone-results">
         ${design.zoneSummaries.map((zoneSummary) => renderVariabilityZoneSummary(zoneSummary)).join("")}

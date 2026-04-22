@@ -3,6 +3,7 @@ import { getDomRefs } from "./app/dom.js";
 import {
   createAppState,
   createSelectedReportOptionKeys,
+  clearCeilingLuminaires,
   createDefaultZoneDraft,
   ensureVariabilityZones,
   getCurrentRoomDraft,
@@ -12,6 +13,8 @@ import {
   resetState,
   setLatestReportState,
   toggleLatestReportOptionSelection,
+  toggleCeilingLuminaireTile,
+  updateCeilingLayout,
   updateZoneDraft
 } from "./app/state.js";
 import { MAX_GRID_FANS, MOUNT_MODES } from "./core/constants.js";
@@ -21,6 +24,8 @@ import {
   getFallbackFlushCandidate,
   parseZoneDrafts
 } from "./core/calepinage.js";
+import { assessOptionCeilingCompatibility } from "./core/ceilingAssessment.js";
+import { buildCeilingGrid } from "./core/ceilingGrid.js";
 import { parseNumber, formatMeters } from "./core/formatters.js";
 import { buildHeightDiameterRequirementMessage } from "./core/messages.js";
 import {
@@ -44,6 +49,7 @@ import {
   setExportAvailability,
   setExportSelectionSummary
 } from "./ui/reportHeader.js";
+import { renderCeilingEditor } from "./ui/ceilingEditor.js";
 import { renderZonesEditor, syncZoneCard } from "./ui/zonesEditor.js";
 import { exportPdfReport } from "./report/pdf.js";
 
@@ -89,6 +95,33 @@ function getRoomInputs() {
     width: parseNumber(dom.widthInput),
     height: parseNumber(dom.heightInput)
   };
+}
+
+function renderCeilingPanel() {
+  dom.ceilingEnabledInput.checked = state.ceilingLayout.enabled;
+  return renderCeilingEditor(dom, state, getCurrentRoomDraft(dom));
+}
+
+function getActiveCeilingGrid(room) {
+  if (!state.ceilingLayout.enabled) {
+    return null;
+  }
+
+  return buildCeilingGrid(room, state.ceilingLayout);
+}
+
+function attachCeilingAssessments(items, room) {
+  const ceilingGrid = getActiveCeilingGrid(room);
+
+  if (!ceilingGrid) {
+    return items;
+  }
+
+  return items.map((item) => ({
+    ...item,
+    ceilingGrid,
+    ceilingAssessment: assessOptionCeilingCompatibility(item, ceilingGrid)
+  }));
 }
 
 function toggleStrategyUI() {
@@ -280,6 +313,7 @@ function renderUniformityEmpty(room, fallbackFlush, generatedAt) {
 
 function render() {
   toggleStrategyUI();
+  renderCeilingPanel();
 
   const rawValues = {
     strategy: dom.strategyInput.value,
@@ -309,7 +343,10 @@ function render() {
     }
 
     const modes = getSelectedModes();
-    const designs = enumerateVariabilityDesigns(room, zones, modes, realDiameters, MAX_GRID_FANS);
+    const designs = attachCeilingAssessments(
+      enumerateVariabilityDesigns(room, zones, modes, realDiameters, MAX_GRID_FANS),
+      room
+    );
     updateHeader({
       strategy: rawValues.strategy,
       room,
@@ -369,7 +406,10 @@ function render() {
     height: rawValues.height
   };
   const modes = getSelectedModes();
-  const candidates = enumerateCandidates(room, MAX_GRID_FANS, modes, realDiameters);
+  const candidates = attachCeilingAssessments(
+    enumerateCandidates(room, MAX_GRID_FANS, modes, realDiameters),
+    room
+  );
   const fallbackFlush = candidates.length === 0 ? getFallbackFlushCandidate(room, MAX_GRID_FANS, realDiameters) : null;
 
   if (candidates.length === 0) {
@@ -427,6 +467,7 @@ dom.resetButton.addEventListener("click", () => {
   dom.allowLowInput.checked = true;
   resetState(state);
   renderZonesPanel();
+  renderCeilingPanel();
   render();
 });
 
@@ -536,13 +577,53 @@ dom.resultsList.addEventListener("change", (event) => {
   updateExportControls();
 });
 
+dom.ceilingEnabledInput.addEventListener("change", () => {
+  updateCeilingLayout(state, {
+    enabled: dom.ceilingEnabledInput.checked
+  });
+  renderCeilingPanel();
+  render();
+});
+
+[dom.ceilingAnchorXInput, dom.ceilingAnchorYInput].forEach((input) => {
+  input.addEventListener("change", () => {
+    updateCeilingLayout(state, {
+      xAnchorMode: dom.ceilingAnchorXInput.value,
+      yAnchorMode: dom.ceilingAnchorYInput.value
+    });
+    renderCeilingPanel();
+    render();
+  });
+});
+
+dom.ceilingEditorCanvas.addEventListener("click", (event) => {
+  const tileElement =
+    event.target && typeof event.target.closest === "function"
+      ? event.target.closest("[data-luminaire-tile-key]")
+      : null;
+
+  if (!tileElement) {
+    return;
+  }
+
+  toggleCeilingLuminaireTile(state, tileElement.dataset.luminaireTileKey);
+  renderCeilingPanel();
+  render();
+});
+
+dom.clearCeilingLuminairesButton.addEventListener("click", () => {
+  clearCeilingLuminaires(state);
+  renderCeilingPanel();
+  render();
+});
+
 [dom.lengthInput, dom.widthInput].forEach((input) => {
   input.addEventListener("change", () => {
-    if (dom.strategyInput.value !== "variabilite") {
-      return;
+    if (dom.strategyInput.value === "variabilite") {
+      normalizeAllZoneDrafts(state, getCurrentRoomDraft(dom));
+      renderZonesPanel();
     }
-    normalizeAllZoneDrafts(state, getCurrentRoomDraft(dom));
-    renderZonesPanel();
+    renderCeilingPanel();
     render();
   });
 });
@@ -563,4 +644,5 @@ bindResultsInteractions(dom);
 initializeCatalogFilters(dom, brasse2Models);
 renderCatalog(dom, brasse2Models);
 toggleStrategyUI();
+renderCeilingPanel();
 render();

@@ -1,5 +1,7 @@
 import { formatMeters } from "../core/formatters.js";
 
+const ROOM_CORNER_RADIUS = 6;
+
 function svgLabelBox(x, y, label, anchor = "middle", fontSize = 10.5) {
   const textWidth = Math.max(54, label.length * (fontSize * 0.6));
   let rectX = x - textWidth / 2 - 6;
@@ -79,11 +81,10 @@ function svgFanSymbol(cx, cy, radius, index) {
   `;
 }
 
-export function getPlanCanvasMetrics(candidate) {
+export function getPlanCanvasMetrics(item) {
   const roomAspectRatio =
-    Math.max(candidate.room.length, candidate.room.width) /
-    Math.min(candidate.room.length, candidate.room.width);
-  const rotateForFit = roomAspectRatio >= 2.2 && candidate.room.length > candidate.room.width;
+    Math.max(item.room.length, item.room.width) / Math.min(item.room.length, item.room.width);
+  const rotateForFit = roomAspectRatio >= 2.2 && item.room.length > item.room.width;
 
   if (rotateForFit) {
     return {
@@ -114,219 +115,458 @@ export function getPlanCanvasMetrics(candidate) {
   };
 }
 
-export function planWrapStyle(candidate) {
-  const { wrapMinHeight } = getPlanCanvasMetrics(candidate);
+export function planWrapStyle(item) {
+  const { wrapMinHeight } = getPlanCanvasMetrics(item);
   return `--plan-min-height:${wrapMinHeight}px;`;
 }
 
-export function svgForCandidate(candidate) {
-  const { roomAspectRatio, rotateForFit, canvasWidth, canvasHeight } = getPlanCanvasMetrics(candidate);
+function buildPlanGeometry(room) {
+  const { roomAspectRatio, rotateForFit, canvasWidth, canvasHeight } = getPlanCanvasMetrics({ room });
   const paddingX = 28;
   const paddingY = 28;
-  const displayRoomLength = rotateForFit ? candidate.room.width : candidate.room.length;
-  const displayRoomHeight = rotateForFit ? candidate.room.length : candidate.room.width;
+  const displayRoomLength = rotateForFit ? room.width : room.length;
+  const displayRoomHeight = rotateForFit ? room.length : room.width;
   const scale = Math.min(
     (canvasWidth - paddingX * 2) / displayRoomLength,
     (canvasHeight - paddingY * 2) / displayRoomHeight
   );
-  const width = canvasWidth;
-  const height = canvasHeight;
   const roomWidth = displayRoomLength * scale;
   const roomHeight = displayRoomHeight * scale;
   const roomX = (canvasWidth - roomWidth) / 2;
   const roomY = (canvasHeight - roomHeight) / 2;
-  const compactMode = roomAspectRatio >= 2.4;
-  const labelFontSize = compactMode ? 9.2 : 10.5;
-  const compactOffset = compactMode ? 2 : 0;
-  const displayCoordinates = candidate.coordinates.map((point) =>
-    rotateForFit ? { x: point.y, y: point.x } : { x: point.x, y: point.y }
-  );
-  const displayCellLength = rotateForFit ? candidate.cellWidth : candidate.cellLength;
-  const displayCellHeight = rotateForFit ? candidate.cellLength : candidate.cellWidth;
-  const displayNx = rotateForFit ? candidate.ny : candidate.nx;
-  const displayNy = rotateForFit ? candidate.nx : candidate.ny;
 
-  const gridLines = [];
-  for (let i = 1; i < displayNx; i += 1) {
-    const x = roomX + i * displayCellLength * scale;
-    gridLines.push(
-      `<line x1="${x}" y1="${roomY}" x2="${x}" y2="${roomY + roomHeight}" stroke="rgba(29,47,44,0.18)" stroke-dasharray="6 5" />`
-    );
-  }
-  for (let j = 1; j < displayNy; j += 1) {
-    const y = roomY + j * displayCellHeight * scale;
-    gridLines.push(
-      `<line x1="${roomX}" y1="${y}" x2="${roomX + roomWidth}" y2="${y}" stroke="rgba(29,47,44,0.18)" stroke-dasharray="6 5" />`
-    );
+  return {
+    roomAspectRatio,
+    rotateForFit,
+    width: canvasWidth,
+    height: canvasHeight,
+    roomX,
+    roomY,
+    roomWidth,
+    roomHeight,
+    scale,
+    displayRoomLength,
+    displayRoomHeight,
+    compactMode: roomAspectRatio >= 2.4,
+    labelFontSize: roomAspectRatio >= 2.4 ? 9.2 : 10.5,
+    compactOffset: roomAspectRatio >= 2.4 ? 2 : 0,
+    projectPoint(point) {
+      const displayPoint = rotateForFit ? { x: point.y, y: point.x } : point;
+      return {
+        x: roomX + displayPoint.x * scale,
+        y: roomY + displayPoint.y * scale
+      };
+    },
+    projectRect(rectangle) {
+      const minPoint = rotateForFit
+        ? { x: rectangle.minY, y: rectangle.minX }
+        : { x: rectangle.minX, y: rectangle.minY };
+      const maxPoint = rotateForFit
+        ? { x: rectangle.maxY, y: rectangle.maxX }
+        : { x: rectangle.maxX, y: rectangle.maxY };
+
+      return {
+        x: roomX + Math.min(minPoint.x, maxPoint.x) * scale,
+        y: roomY + Math.min(minPoint.y, maxPoint.y) * scale,
+        width: Math.abs(maxPoint.x - minPoint.x) * scale,
+        height: Math.abs(maxPoint.y - minPoint.y) * scale
+      };
+    }
+  };
+}
+
+function getRenderedCoordinates(item) {
+  const ceilingAssessment = item.ceilingAssessment;
+
+  if (ceilingAssessment?.enabled && ceilingAssessment.compatible && ceilingAssessment.appliedCoordinates) {
+    return ceilingAssessment.appliedCoordinates;
   }
 
-  const fans = displayCoordinates
-    .map((point, index) => {
-      const cx = roomX + point.x * scale;
-      const cy = roomY + point.y * scale;
-      const r = (candidate.diameter / 2) * scale;
-      return svgFanSymbol(cx, cy, r, index);
+  return item.coordinates;
+}
+
+function renderCeilingOverlay(geometry, ceilingGrid) {
+  if (!ceilingGrid) {
+    return "";
+  }
+
+  return ceilingGrid.tiles
+    .map((tile) => {
+      const rectangle = geometry.projectRect(tile);
+      const fill = tile.hasLuminaire
+        ? "rgba(184,109,33,0.22)"
+        : tile.isCut
+          ? "rgba(29,47,44,0.05)"
+          : "rgba(255,255,255,0.28)";
+      const stroke = tile.hasLuminaire ? "rgba(184,109,33,0.64)" : "rgba(29,47,44,0.12)";
+
+      return `
+        <rect
+          x="${rectangle.x}"
+          y="${rectangle.y}"
+          width="${rectangle.width}"
+          height="${rectangle.height}"
+          rx="6"
+          fill="${fill}"
+          stroke="${stroke}"
+          stroke-width="${tile.hasLuminaire ? 1.3 : 1}"
+        />
+      `;
     })
     .join("");
+}
+
+function renderTheoreticalGhostCenters(geometry, item, displayCoordinates) {
+  const assessment = item.ceilingAssessment;
+
+  if (!assessment?.compatible || !assessment.shiftApplied) {
+    return "";
+  }
+
+  return item.coordinates
+    .map((point, index) => {
+      const renderedPoint = geometry.projectPoint(point);
+      const shiftedPoint = geometry.projectPoint(displayCoordinates[index]);
+      return `
+        <g>
+          <line
+            x1="${renderedPoint.x}"
+            y1="${renderedPoint.y}"
+            x2="${shiftedPoint.x}"
+            y2="${shiftedPoint.y}"
+            stroke="rgba(107,114,128,0.5)"
+            stroke-width="1.2"
+            stroke-dasharray="4 4"
+          />
+          <circle cx="${renderedPoint.x}" cy="${renderedPoint.y}" r="3.2" fill="rgba(107,114,128,0.65)" />
+        </g>
+      `;
+    })
+    .join("");
+}
+
+function renderUniformGrid(geometry, item) {
+  const displayCellLength = geometry.rotateForFit ? item.cellWidth : item.cellLength;
+  const displayCellHeight = geometry.rotateForFit ? item.cellLength : item.cellWidth;
+  const displayNx = geometry.rotateForFit ? item.ny : item.nx;
+  const displayNy = geometry.rotateForFit ? item.nx : item.ny;
+  const gridLines = [];
+
+  for (let index = 1; index < displayNx; index += 1) {
+    const x = geometry.roomX + index * displayCellLength * geometry.scale;
+    gridLines.push(
+      `<line x1="${x}" y1="${geometry.roomY}" x2="${x}" y2="${geometry.roomY + geometry.roomHeight}" stroke="rgba(29,47,44,0.18)" stroke-dasharray="6 5" />`
+    );
+  }
+
+  for (let index = 1; index < displayNy; index += 1) {
+    const y = geometry.roomY + index * displayCellHeight * geometry.scale;
+    gridLines.push(
+      `<line x1="${geometry.roomX}" y1="${y}" x2="${geometry.roomX + geometry.roomWidth}" y2="${y}" stroke="rgba(29,47,44,0.18)" stroke-dasharray="6 5" />`
+    );
+  }
+
+  return gridLines.join("");
+}
+
+function renderFans(geometry, item, displayCoordinates) {
+  return displayCoordinates
+    .map((point, index) => {
+      const renderedPoint = geometry.projectPoint(point);
+      const radius = (item.diameter / 2) * geometry.scale;
+      return svgFanSymbol(renderedPoint.x, renderedPoint.y, radius, index);
+    })
+    .join("");
+}
+
+function getNearestWallMeasurement(room, point) {
+  return [
+    { axis: "x", boundary: 0, clearance: point.x },
+    { axis: "x", boundary: room.length, clearance: room.length - point.x },
+    { axis: "y", boundary: 0, clearance: point.y },
+    { axis: "y", boundary: room.width, clearance: room.width - point.y }
+  ].sort((a, b) => a.clearance - b.clearance)[0];
+}
+
+function renderCandidateMeasurements(geometry, candidate, displayCoordinates) {
+  if (displayCoordinates.length === 0) {
+    return "";
+  }
 
   const firstPoint = displayCoordinates[0];
-  const firstCx = roomX + firstPoint.x * scale;
-  const firstCy = roomY + firstPoint.y * scale;
-  const radius = (candidate.diameter / 2) * scale;
+  const firstRenderedPoint = geometry.projectPoint(firstPoint);
+  const radius = (candidate.diameter / 2) * geometry.scale;
   const measurements = [];
 
   measurements.push(
     svgDimensionLine(
-      firstCx - radius,
-      firstCy - radius - (compactMode ? 8 : 12),
-      firstCx + radius,
-      firstCy - radius - (compactMode ? 8 : 12),
+      firstRenderedPoint.x - radius,
+      firstRenderedPoint.y - radius - (geometry.compactMode ? 8 : 12),
+      firstRenderedPoint.x + radius,
+      firstRenderedPoint.y - radius - (geometry.compactMode ? 8 : 12),
       `D ${formatMeters(candidate.diameter)}`,
       "middle",
       0,
-      compactMode ? -6 : -8,
-      labelFontSize
+      geometry.compactMode ? -6 : -8,
+      geometry.labelFontSize
     )
   );
 
-  if (firstPoint.x <= firstPoint.y) {
+  const nearestWall = getNearestWallMeasurement(candidate.room, firstPoint);
+  const displayedWallClearance =
+    candidate.ceilingAssessment?.wallClearance || candidate.wallClearance;
+
+  if (nearestWall.axis === "x") {
+    const wallX = nearestWall.boundary === 0 ? geometry.roomX : geometry.roomX + geometry.roomWidth;
+    const lineY = Math.min(
+      geometry.height - 14,
+      firstRenderedPoint.y + radius + (geometry.compactMode ? 12 : 16)
+    );
+
     measurements.push(
       svgDimensionLine(
-        roomX,
-        Math.min(height - 14, firstCy + radius + (compactMode ? 12 : 16)),
-        firstCx,
-        Math.min(height - 14, firstCy + radius + (compactMode ? 12 : 16)),
-        `Mur ${formatMeters(firstPoint.x)}`,
+        wallX,
+        lineY,
+        firstRenderedPoint.x,
+        lineY,
+        `Mur ${formatMeters(displayedWallClearance)}`,
         "middle",
         0,
-        compactMode ? -6 : -8,
-        labelFontSize
+        geometry.compactMode ? -6 : -8,
+        geometry.labelFontSize
       )
     );
   } else {
+    const wallY = nearestWall.boundary === 0 ? geometry.roomY : geometry.roomY + geometry.roomHeight;
+    const lineX = Math.min(
+      geometry.width - 16,
+      firstRenderedPoint.x + radius + (geometry.compactMode ? 12 : 16)
+    );
+
     measurements.push(
       svgDimensionLine(
-        Math.min(width - 16, firstCx + radius + (compactMode ? 12 : 16)),
-        roomY,
-        Math.min(width - 16, firstCx + radius + (compactMode ? 12 : 16)),
-        firstCy,
-        `Mur ${formatMeters(firstPoint.y)}`,
+        lineX,
+        wallY,
+        lineX,
+        firstRenderedPoint.y,
+        `Mur ${formatMeters(displayedWallClearance)}`,
         "start",
-        8 + compactOffset,
+        8 + geometry.compactOffset,
         -2,
-        labelFontSize
+        geometry.labelFontSize
       )
     );
   }
 
   if (candidate.interFanSpacing) {
+    const displayCellLength = geometry.rotateForFit ? candidate.cellWidth : candidate.cellLength;
+    const displayCellHeight = geometry.rotateForFit ? candidate.cellLength : candidate.cellWidth;
+    const displayNx = geometry.rotateForFit ? candidate.ny : candidate.nx;
+    const displayNy = geometry.rotateForFit ? candidate.nx : candidate.ny;
     const horizontalSpacing = displayNx > 1 ? displayCellLength : Number.POSITIVE_INFINITY;
     const verticalSpacing = displayNy > 1 ? displayCellHeight : Number.POSITIVE_INFINITY;
 
     if (horizontalSpacing <= verticalSpacing) {
-      const secondCx = roomX + (firstPoint.x + displayCellLength) * scale;
-      const lineY = Math.max(roomY + 10, firstCy - radius - (compactMode ? 26 : 34));
+      const secondRenderedPoint = geometry.projectPoint({
+        x: firstPoint.x + displayCellLength,
+        y: firstPoint.y
+      });
+      const lineY = Math.max(
+        geometry.roomY + 10,
+        firstRenderedPoint.y - radius - (geometry.compactMode ? 26 : 34)
+      );
       measurements.push(
         svgDimensionLine(
-          firstCx,
+          firstRenderedPoint.x,
           lineY,
-          secondCx,
+          secondRenderedPoint.x,
           lineY,
-          `Entraxe ${formatMeters(displayCellLength)}`,
+          `Entraxe ${formatMeters(candidate.interFanSpacing)}`,
           "middle",
           0,
-          compactMode ? -6 : -8,
-          labelFontSize
+          geometry.compactMode ? -6 : -8,
+          geometry.labelFontSize
         )
       );
     } else {
-      const secondCy = roomY + (firstPoint.y + displayCellHeight) * scale;
-      const lineX = Math.min(width - 12, firstCx + radius + (compactMode ? 24 : 32));
+      const secondRenderedPoint = geometry.projectPoint({
+        x: firstPoint.x,
+        y: firstPoint.y + displayCellHeight
+      });
+      const lineX = Math.min(
+        geometry.width - 12,
+        firstRenderedPoint.x + radius + (geometry.compactMode ? 24 : 32)
+      );
       measurements.push(
         svgDimensionLine(
           lineX,
-          firstCy,
+          firstRenderedPoint.y,
           lineX,
-          secondCy,
-          `Entraxe ${formatMeters(displayCellHeight)}`,
+          secondRenderedPoint.y,
+          `Entraxe ${formatMeters(candidate.interFanSpacing)}`,
           "start",
-          8 + compactOffset,
+          8 + geometry.compactOffset,
           -2,
-          labelFontSize
+          geometry.labelFontSize
         )
       );
     }
   }
 
+  return measurements.join("");
+}
+
+function renderVariabilityMeasurements(geometry, design, displayCoordinates) {
+  if (displayCoordinates.length === 0) {
+    return "";
+  }
+
+  const measurements = [];
+  const firstPoint = displayCoordinates[0];
+  const firstRenderedPoint = geometry.projectPoint(firstPoint);
+  const radius = (design.diameter / 2) * geometry.scale;
+
+  measurements.push(
+    svgDimensionLine(
+      firstRenderedPoint.x - radius,
+      firstRenderedPoint.y - radius - (geometry.compactMode ? 8 : 12),
+      firstRenderedPoint.x + radius,
+      firstRenderedPoint.y - radius - (geometry.compactMode ? 8 : 12),
+      `D ${formatMeters(design.diameter)}`,
+      "middle",
+      0,
+      geometry.compactMode ? -6 : -8,
+      geometry.labelFontSize
+    )
+  );
+
+  const displayedWallClearance = design.ceilingAssessment?.wallClearance || design.wallClearance;
+  let closestPoint = displayCoordinates
+    .map((point) => ({
+      point,
+      nearestWall: getNearestWallMeasurement(design.room, point)
+    }))
+    .sort((a, b) => a.nearestWall.clearance - b.nearestWall.clearance)[0];
+
+  if (!design.ceilingAssessment?.shiftApplied && design.minimumWallCellKey) {
+    const wallCellIndex = design.selectedCells.findIndex((cell) => cell.key === design.minimumWallCellKey);
+    if (wallCellIndex >= 0) {
+      closestPoint = {
+        point: displayCoordinates[wallCellIndex],
+        nearestWall: getNearestWallMeasurement(design.room, displayCoordinates[wallCellIndex])
+      };
+    }
+  }
+
+  const renderedClosestPoint = geometry.projectPoint(closestPoint.point);
+
+  if (closestPoint.nearestWall.axis === "x") {
+    const wallX =
+      closestPoint.nearestWall.boundary === 0
+        ? geometry.roomX
+        : geometry.roomX + geometry.roomWidth;
+    const lineY = Math.min(
+      geometry.height - 14,
+      renderedClosestPoint.y + (geometry.compactMode ? 20 : 24)
+    );
+    measurements.push(
+      svgDimensionLine(
+        wallX,
+        lineY,
+        renderedClosestPoint.x,
+        lineY,
+        `Mur ${formatMeters(displayedWallClearance)}`,
+        "middle",
+        0,
+        geometry.compactMode ? -6 : -8,
+        geometry.labelFontSize
+      )
+    );
+  } else {
+    const wallY =
+      closestPoint.nearestWall.boundary === 0
+        ? geometry.roomY
+        : geometry.roomY + geometry.roomHeight;
+    const lineX = Math.min(
+      geometry.width - 12,
+      renderedClosestPoint.x + (geometry.compactMode ? 20 : 24)
+    );
+    measurements.push(
+      svgDimensionLine(
+        lineX,
+        wallY,
+        lineX,
+        renderedClosestPoint.y,
+        `Mur ${formatMeters(displayedWallClearance)}`,
+        "start",
+        8 + geometry.compactOffset,
+        -2,
+        geometry.labelFontSize
+      )
+    );
+  }
+
+  if (design.interFanSpacing) {
+    let firstSpacingPoint = displayCoordinates[0];
+    let secondSpacingPoint = displayCoordinates[1] || displayCoordinates[0];
+
+    if (design.minimumSpacingPair) {
+      const firstIndex = design.selectedCells.findIndex((cell) => cell.key === design.minimumSpacingPair[0]);
+      const secondIndex = design.selectedCells.findIndex((cell) => cell.key === design.minimumSpacingPair[1]);
+
+      if (firstIndex >= 0 && secondIndex >= 0) {
+        firstSpacingPoint = displayCoordinates[firstIndex];
+        secondSpacingPoint = displayCoordinates[secondIndex];
+      }
+    }
+
+    const firstRenderedSpacingPoint = geometry.projectPoint(firstSpacingPoint);
+    const secondRenderedSpacingPoint = geometry.projectPoint(secondSpacingPoint);
+
+    measurements.push(
+      svgDimensionLine(
+        firstRenderedSpacingPoint.x,
+        firstRenderedSpacingPoint.y,
+        secondRenderedSpacingPoint.x,
+        secondRenderedSpacingPoint.y,
+        `Entraxe ${formatMeters(design.interFanSpacing)}`,
+        "middle",
+        0,
+        geometry.compactMode ? -10 : -12,
+        geometry.labelFontSize
+      )
+    );
+  }
+
+  return measurements.join("");
+}
+
+export function svgForCandidate(candidate) {
+  const geometry = buildPlanGeometry(candidate.room);
+  const displayCoordinates = getRenderedCoordinates(candidate);
+  const fans = renderFans(geometry, candidate, displayCoordinates);
+  const theoreticalGhosts = renderTheoreticalGhostCenters(geometry, candidate, displayCoordinates);
+  const measurements = renderCandidateMeasurements(geometry, candidate, displayCoordinates);
+
   return `
-    <svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
-      <rect x="${roomX}" y="${roomY}" width="${roomWidth}" height="${roomHeight}" rx="18" fill="#faf5eb" stroke="rgba(29,47,44,0.2)" stroke-width="2.5" />
-      ${gridLines.join("")}
+    <svg viewBox="0 0 ${geometry.width} ${geometry.height}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+      <rect x="${geometry.roomX}" y="${geometry.roomY}" width="${geometry.roomWidth}" height="${geometry.roomHeight}" rx="${ROOM_CORNER_RADIUS}" fill="#faf5eb" stroke="rgba(29,47,44,0.2)" stroke-width="2.5" />
+      ${renderCeilingOverlay(geometry, candidate.ceilingGrid)}
+      ${renderUniformGrid(geometry, candidate)}
+      ${theoreticalGhosts}
       ${fans}
-      ${measurements.join("")}
+      ${measurements}
     </svg>
   `;
 }
 
 export function svgForVariabilityDesign(design) {
-  const { roomAspectRatio, rotateForFit, canvasWidth, canvasHeight } = getPlanCanvasMetrics(design);
-  const paddingX = 28;
-  const paddingY = 28;
-  const displayRoomLength = rotateForFit ? design.room.width : design.room.length;
-  const displayRoomHeight = rotateForFit ? design.room.length : design.room.width;
-  const scale = Math.min(
-    (canvasWidth - paddingX * 2) / displayRoomLength,
-    (canvasHeight - paddingY * 2) / displayRoomHeight
-  );
-  const width = canvasWidth;
-  const height = canvasHeight;
-  const roomWidth = displayRoomLength * scale;
-  const roomHeight = displayRoomHeight * scale;
-  const roomX = (canvasWidth - roomWidth) / 2;
-  const roomY = (canvasHeight - roomHeight) / 2;
-  const compactMode = roomAspectRatio >= 2.4;
-  const labelFontSize = compactMode ? 9.2 : 10.5;
-  const compactOffset = compactMode ? 2 : 0;
-  const displayCellLength = rotateForFit ? design.cellWidth : design.cellLength;
-  const displayCellHeight = rotateForFit ? design.cellLength : design.cellWidth;
-  const displayNx = rotateForFit ? design.ny : design.nx;
-  const displayNy = rotateForFit ? design.nx : design.ny;
-  const transformPoint = (point) => (rotateForFit ? { x: point.y, y: point.x } : { x: point.x, y: point.y });
-  const transformRect = (rectangle) => {
-    const minPoint = transformPoint({ x: rectangle.minX, y: rectangle.minY });
-    const maxPoint = transformPoint({ x: rectangle.maxX, y: rectangle.maxY });
-
-    return {
-      x: roomX + Math.min(minPoint.x, maxPoint.x) * scale,
-      y: roomY + Math.min(minPoint.y, maxPoint.y) * scale,
-      width: Math.abs(maxPoint.x - minPoint.x) * scale,
-      height: Math.abs(maxPoint.y - minPoint.y) * scale
-    };
-  };
-
-  const displaySelectedCells = design.selectedCells.map((cell) => ({
-    ...cell,
-    displayCenter: transformPoint({ x: cell.centerX, y: cell.centerY }),
-    displayRect: transformRect(cell)
-  }));
-
-  const gridLines = [];
-  for (let i = 1; i < displayNx; i += 1) {
-    const x = roomX + i * displayCellLength * scale;
-    gridLines.push(
-      `<line x1="${x}" y1="${roomY}" x2="${x}" y2="${roomY + roomHeight}" stroke="rgba(29,47,44,0.18)" stroke-dasharray="6 5" />`
-    );
-  }
-  for (let j = 1; j < displayNy; j += 1) {
-    const y = roomY + j * displayCellHeight * scale;
-    gridLines.push(
-      `<line x1="${roomX}" y1="${y}" x2="${roomX + roomWidth}" y2="${y}" stroke="rgba(29,47,44,0.18)" stroke-dasharray="6 5" />`
-    );
-  }
+  const geometry = buildPlanGeometry(design.room);
+  const displayCoordinates = getRenderedCoordinates(design);
 
   const zoneShapes = design.targetZones
     .map((zone, index) => {
-      const rectangle = transformRect(zone);
+      const rectangle = geometry.projectRect(zone);
       return `
         <g>
           <rect x="${rectangle.x}" y="${rectangle.y}" width="${rectangle.width}" height="${rectangle.height}" rx="10"
@@ -337,118 +577,49 @@ export function svgForVariabilityDesign(design) {
     })
     .join("");
 
-  const selectedCellShapes = displaySelectedCells
-    .map(
-      (cell) => `
-        <rect x="${cell.displayRect.x}" y="${cell.displayRect.y}" width="${cell.displayRect.width}" height="${cell.displayRect.height}" rx="8"
+  const selectedCellShapes = design.selectedCells
+    .map((cell) => {
+      const rectangle = geometry.projectRect(cell);
+      return `
+        <rect x="${rectangle.x}" y="${rectangle.y}" width="${rectangle.width}" height="${rectangle.height}" rx="8"
           fill="rgba(31,79,130,0.10)" stroke="rgba(31,79,130,0.38)" stroke-width="1.4" />
-      `
-    )
-    .join("");
-
-  const fans = displaySelectedCells
-    .map((cell, index) => {
-      const cx = roomX + cell.displayCenter.x * scale;
-      const cy = roomY + cell.displayCenter.y * scale;
-      const r = (design.diameter / 2) * scale;
-      return svgFanSymbol(cx, cy, r, index);
+      `;
     })
     .join("");
 
-  const measurements = [];
-  const firstCell = displaySelectedCells[0];
-  if (firstCell) {
-    const firstCx = roomX + firstCell.displayCenter.x * scale;
-    const firstCy = roomY + firstCell.displayCenter.y * scale;
-    const radius = (design.diameter / 2) * scale;
-    measurements.push(
-      svgDimensionLine(
-        firstCx - radius,
-        firstCy - radius - (compactMode ? 8 : 12),
-        firstCx + radius,
-        firstCy - radius - (compactMode ? 8 : 12),
-        `D ${formatMeters(design.diameter)}`,
-        "middle",
-        0,
-        compactMode ? -6 : -8,
-        labelFontSize
-      )
+  const fans = renderFans(geometry, design, displayCoordinates);
+  const theoreticalGhosts = renderTheoreticalGhostCenters(geometry, design, displayCoordinates);
+  const measurements = renderVariabilityMeasurements(geometry, design, displayCoordinates);
+  const displayCellLength = geometry.rotateForFit ? design.cellWidth : design.cellLength;
+  const displayCellHeight = geometry.rotateForFit ? design.cellLength : design.cellWidth;
+  const displayNx = geometry.rotateForFit ? design.ny : design.nx;
+  const displayNy = geometry.rotateForFit ? design.nx : design.ny;
+  const gridLines = [];
+
+  for (let index = 1; index < displayNx; index += 1) {
+    const x = geometry.roomX + index * displayCellLength * geometry.scale;
+    gridLines.push(
+      `<line x1="${x}" y1="${geometry.roomY}" x2="${x}" y2="${geometry.roomY + geometry.roomHeight}" stroke="rgba(29,47,44,0.18)" stroke-dasharray="6 5" />`
     );
   }
 
-  if (design.minimumWallCellKey) {
-    const wallCell = displaySelectedCells.find((cell) => cell.key === design.minimumWallCellKey);
-    if (wallCell) {
-      const cx = roomX + wallCell.displayCenter.x * scale;
-      const cy = roomY + wallCell.displayCenter.y * scale;
-      const distances = [
-        { axis: "x", boundary: roomX, value: wallCell.displayCenter.x },
-        { axis: "x", boundary: roomX + roomWidth, value: displayRoomLength - wallCell.displayCenter.x },
-        { axis: "y", boundary: roomY, value: wallCell.displayCenter.y },
-        { axis: "y", boundary: roomY + roomHeight, value: displayRoomHeight - wallCell.displayCenter.y }
-      ].sort((a, b) => a.value - b.value);
-      const nearest = distances[0];
-
-      if (nearest.axis === "x") {
-        measurements.push(
-          svgDimensionLine(
-            nearest.boundary,
-            Math.min(height - 14, cy + (compactMode ? 20 : 24)),
-            cx,
-            Math.min(height - 14, cy + (compactMode ? 20 : 24)),
-            `Mur ${formatMeters(design.wallClearance)}`,
-            "middle",
-            0,
-            compactMode ? -6 : -8,
-            labelFontSize
-          )
-        );
-      } else {
-        measurements.push(
-          svgDimensionLine(
-            Math.min(width - 12, cx + (compactMode ? 20 : 24)),
-            nearest.boundary,
-            Math.min(width - 12, cx + (compactMode ? 20 : 24)),
-            cy,
-            `Mur ${formatMeters(design.wallClearance)}`,
-            "start",
-            8 + compactOffset,
-            -2,
-            labelFontSize
-          )
-        );
-      }
-    }
-  }
-
-  if (design.minimumSpacingPair) {
-    const firstSpacingCell = displaySelectedCells.find((cell) => cell.key === design.minimumSpacingPair[0]);
-    const secondSpacingCell = displaySelectedCells.find((cell) => cell.key === design.minimumSpacingPair[1]);
-    if (firstSpacingCell && secondSpacingCell) {
-      measurements.push(
-        svgDimensionLine(
-          roomX + firstSpacingCell.displayCenter.x * scale,
-          roomY + firstSpacingCell.displayCenter.y * scale,
-          roomX + secondSpacingCell.displayCenter.x * scale,
-          roomY + secondSpacingCell.displayCenter.y * scale,
-          `Entraxe ${formatMeters(design.interFanSpacing)}`,
-          "middle",
-          0,
-          compactMode ? -10 : -12,
-          labelFontSize
-        )
-      );
-    }
+  for (let index = 1; index < displayNy; index += 1) {
+    const y = geometry.roomY + index * displayCellHeight * geometry.scale;
+    gridLines.push(
+      `<line x1="${geometry.roomX}" y1="${y}" x2="${geometry.roomX + geometry.roomWidth}" y2="${y}" stroke="rgba(29,47,44,0.18)" stroke-dasharray="6 5" />`
+    );
   }
 
   return `
-    <svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
-      <rect x="${roomX}" y="${roomY}" width="${roomWidth}" height="${roomHeight}" rx="18" fill="#faf5eb" stroke="rgba(29,47,44,0.2)" stroke-width="2.5" />
+    <svg viewBox="0 0 ${geometry.width} ${geometry.height}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+      <rect x="${geometry.roomX}" y="${geometry.roomY}" width="${geometry.roomWidth}" height="${geometry.roomHeight}" rx="${ROOM_CORNER_RADIUS}" fill="#faf5eb" stroke="rgba(29,47,44,0.2)" stroke-width="2.5" />
+      ${renderCeilingOverlay(geometry, design.ceilingGrid)}
       ${gridLines.join("")}
       ${zoneShapes}
       ${selectedCellShapes}
+      ${theoreticalGhosts}
       ${fans}
-      ${measurements.join("")}
+      ${measurements}
     </svg>
   `;
 }

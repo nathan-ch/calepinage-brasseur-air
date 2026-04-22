@@ -175,6 +175,54 @@
               </div>
             </section>
 
+            <section class="ceiling-shell">
+              <label class="toggle-card" for="ceiling-enabled">
+                <input id="ceiling-enabled" type="checkbox">
+                <span>
+                  <strong>Prendre en compte le faux plafond et l'eclairage</strong>
+                  <small>Affiche le quadrillage 60 × 60 cm, permet de placer les luminaires existants et lit la compatibilite faux plafond des options.</small>
+                </span>
+              </label>
+
+              <div id="ceiling-config" class="ceiling-editor hidden">
+                <div class="zone-editor-head">
+                  <strong>Faux plafond et luminaires existants</strong>
+                  <p>
+                    Cliquez sur les dalles pour indiquer les luminaires en place. Le site cherche ensuite, a titre
+                    informatif, un decalage global de la trame des brasseurs pour eviter les rails et les dalles occupees.
+                  </p>
+                </div>
+
+                <div class="field-grid ceiling-anchor-grid">
+                  <div class="field">
+                    <label for="ceiling-anchor-x">Trame sur la longueur</label>
+                    <select id="ceiling-anchor-x">
+                      <option value="min_side">Depart cote 0</option>
+                      <option value="max_side">Depart cote oppose</option>
+                      <option value="symmetric">Decoupe symetrique</option>
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label for="ceiling-anchor-y">Trame sur la largeur</label>
+                    <select id="ceiling-anchor-y">
+                      <option value="min_side">Depart cote 0</option>
+                      <option value="max_side">Depart cote oppose</option>
+                      <option value="symmetric">Decoupe symetrique</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="ceiling-editor-panel">
+                  <p id="ceiling-editor-summary" class="hint"></p>
+                  <div id="ceiling-editor-canvas" class="ceiling-editor-canvas"></div>
+                  <div class="zone-inline">
+                    <button class="secondary" type="button" id="clear-ceiling-luminaires">Effacer les luminaires</button>
+                    <p class="hint">Un clic sur une dalle ajoute ou retire un luminaire.</p>
+                  </div>
+                </div>
+              </div>
+            </section>
+
             <div class="stack">
               <span class="hint">Montages étudiés</span>
               <div class="check-list">

@@ -128,6 +128,13 @@ function getDomRefs() {
     lengthInput: document.getElementById("length"),
     widthInput: document.getElementById("width"),
     heightInput: document.getElementById("height"),
+    ceilingEnabledInput: document.getElementById("ceiling-enabled"),
+    ceilingConfig: document.getElementById("ceiling-config"),
+    ceilingAnchorXInput: document.getElementById("ceiling-anchor-x"),
+    ceilingAnchorYInput: document.getElementById("ceiling-anchor-y"),
+    ceilingEditorSummary: document.getElementById("ceiling-editor-summary"),
+    ceilingEditorCanvas: document.getElementById("ceiling-editor-canvas"),
+    clearCeilingLuminairesButton: document.getElementById("clear-ceiling-luminaires"),
     zonesConfig: document.getElementById("zones-config"),
     zonesList: document.getElementById("zones-list"),
     addZoneButton: document.getElementById("add-zone-button"),
@@ -186,11 +193,22 @@ function normalizeZoneDraft(zone, room) {
   };
 }
 
+function createDefaultCeilingLayout() {
+  return {
+    enabled: false,
+    tileSize: 0.6,
+    xAnchorMode: "symmetric",
+    yAnchorMode: "symmetric",
+    luminaireTiles: new Set()
+  };
+}
+
 function createAppState() {
   return {
     nextZoneId: 1,
     variabilityZones: [],
-    latestReportState: null
+    latestReportState: null,
+    ceilingLayout: createDefaultCeilingLayout()
   };
 }
 
@@ -247,6 +265,33 @@ function removeZoneDraft(state, zoneId) {
 
 function setLatestReportState(state, latestReportState) {
   state.latestReportState = latestReportState;
+}
+
+function updateCeilingLayout(state, patch) {
+  state.ceilingLayout = {
+    ...state.ceilingLayout,
+    ...patch,
+    luminaireTiles:
+      patch.luminaireTiles instanceof Set
+        ? patch.luminaireTiles
+        : new Set(state.ceilingLayout.luminaireTiles)
+  };
+}
+
+function toggleCeilingLuminaireTile(state, tileKey) {
+  const nextLuminaireTiles = new Set(state.ceilingLayout.luminaireTiles);
+
+  if (nextLuminaireTiles.has(tileKey)) {
+    nextLuminaireTiles.delete(tileKey);
+  } else {
+    nextLuminaireTiles.add(tileKey);
+  }
+
+  updateCeilingLayout(state, { luminaireTiles: nextLuminaireTiles });
+}
+
+function clearCeilingLuminaires(state) {
+  updateCeilingLayout(state, { luminaireTiles: new Set() });
 }
 
 function createSelectedReportOptionKeys(items) {
@@ -314,6 +359,7 @@ function toggleLatestReportOptionSelection(state, optionKey, selected) {
 function resetState(state) {
   state.variabilityZones = [];
   state.latestReportState = null;
+  state.ceilingLayout = createDefaultCeilingLayout();
 }
 
 function getZoneBounds(zone, room) {
@@ -592,6 +638,384 @@ function getFilteredCatalogModels(brasse2Models, filters) {
       return true;
     })
     .sort(comparator);
+}
+
+// src/core/ceilingGrid.js
+const CEILING_TILE_SIZE = 0.6;
+const CEILING_ANCHOR_MODES = ["min_side", "max_side", "symmetric"];
+
+function ceilingGridRound(value) {
+  return Number(value.toFixed(6));
+}
+
+function buildCeilingAxisTiles(length, tileSize, anchorMode, axisName) {
+  const safeLength = Math.max(0, length);
+  const fullTileCount = Math.floor((safeLength + EPS) / tileSize);
+  const rawRemainder = safeLength - fullTileCount * tileSize;
+  const remainder = rawRemainder > EPS ? rawRemainder : 0;
+  const tiles = [];
+  let cursor = 0;
+
+  const pushTile = (min, max, kind) => {
+    if (max - min <= EPS) {
+      return;
+    }
+
+    tiles.push({
+      axis: axisName,
+      index: tiles.length,
+      key: `${axisName}-${tiles.length}`,
+      min: ceilingGridRound(min),
+      max: ceilingGridRound(max),
+      size: ceilingGridRound(max - min),
+      center: ceilingGridRound((min + max) / 2),
+      isCut: kind === "cut"
+    });
+  };
+
+  if (remainder === 0 || anchorMode === "min_side") {
+    for (let index = 0; index < fullTileCount; index += 1) {
+      pushTile(cursor, cursor + tileSize, "full");
+      cursor += tileSize;
+    }
+    if (remainder > 0) {
+      pushTile(cursor, safeLength, "cut");
+    }
+  } else if (anchorMode === "max_side") {
+    pushTile(0, remainder, "cut");
+    cursor = remainder;
+    for (let index = 0; index < fullTileCount; index += 1) {
+      pushTile(cursor, cursor + tileSize, "full");
+      cursor += tileSize;
+    }
+  } else {
+    const sideCut = remainder / 2;
+    pushTile(0, sideCut, "cut");
+    cursor = sideCut;
+    for (let index = 0; index < fullTileCount; index += 1) {
+      pushTile(cursor, cursor + tileSize, "full");
+      cursor += tileSize;
+    }
+    pushTile(cursor, safeLength, "cut");
+  }
+
+  const boundaries = [...new Set([0, ...tiles.flatMap((tile) => [tile.min, tile.max]), safeLength])].sort(
+    (a, b) => a - b
+  );
+
+  return {
+    axis: axisName,
+    length: safeLength,
+    tileSize,
+    anchorMode,
+    tiles,
+    boundaries,
+    centers: tiles.map((tile) => ({
+      index: tile.index,
+      key: tile.key,
+      center: tile.center,
+      min: tile.min,
+      max: tile.max,
+      isCut: tile.isCut
+    })),
+    fullTilesCount: tiles.filter((tile) => !tile.isCut).length,
+    cutTilesCount: tiles.filter((tile) => tile.isCut).length
+  };
+}
+
+function buildCeilingGrid(room, ceilingLayout) {
+  if (!room || !(room.length > 0) || !(room.width > 0)) {
+    return null;
+  }
+
+  const tileSize = ceilingLayout?.tileSize || CEILING_TILE_SIZE;
+  const xAxis = buildCeilingAxisTiles(
+    room.length,
+    tileSize,
+    ceilingLayout?.xAnchorMode || "symmetric",
+    "x"
+  );
+  const yAxis = buildCeilingAxisTiles(
+    room.width,
+    tileSize,
+    ceilingLayout?.yAnchorMode || "symmetric",
+    "y"
+  );
+  const luminaireTiles =
+    ceilingLayout?.luminaireTiles instanceof Set ? ceilingLayout.luminaireTiles : new Set();
+  const tiles = [];
+  const tileMap = new Map();
+
+  xAxis.tiles.forEach((xTile) => {
+    yAxis.tiles.forEach((yTile) => {
+      const key = `${xTile.index}:${yTile.index}`;
+      const tile = {
+        key,
+        xIndex: xTile.index,
+        yIndex: yTile.index,
+        minX: xTile.min,
+        maxX: xTile.max,
+        minY: yTile.min,
+        maxY: yTile.max,
+        width: xTile.size,
+        height: yTile.size,
+        centerX: xTile.center,
+        centerY: yTile.center,
+        isCut: xTile.isCut || yTile.isCut,
+        hasLuminaire: luminaireTiles.has(key)
+      };
+
+      tiles.push(tile);
+      tileMap.set(key, tile);
+    });
+  });
+
+  return {
+    room,
+    tileSize,
+    xAnchorMode: xAxis.anchorMode,
+    yAnchorMode: yAxis.anchorMode,
+    xAxis,
+    yAxis,
+    tiles,
+    tileMap,
+    luminaireTiles,
+    luminairesCount: tiles.filter((tile) => tile.hasLuminaire).length,
+    fullTilesCount: tiles.filter((tile) => !tile.isCut).length,
+    cutTilesCount: tiles.filter((tile) => tile.isCut).length
+  };
+}
+
+// src/core/ceilingAssessment.js
+function ceilingAssessmentValueKey(value) {
+  return value.toFixed(6);
+}
+
+function getUniqueCoordinateValues(values) {
+  const seen = new Set();
+  const uniqueValues = [];
+
+  values.forEach((value) => {
+    const key = ceilingAssessmentValueKey(value);
+    if (seen.has(key)) {
+      return;
+    }
+    seen.add(key);
+    uniqueValues.push(value);
+  });
+
+  return uniqueValues;
+}
+
+function findCenterMatch(axisCenters, value) {
+  return axisCenters.find((center) => Math.abs(center.center - value) <= EPS) || null;
+}
+
+function buildAxisShiftCandidates(axisValues, axisCenters) {
+  if (axisValues.length === 0 || axisCenters.length === 0) {
+    return [];
+  }
+
+  const referenceValue = axisValues[0];
+  const seenShifts = new Set();
+  const candidates = [];
+
+  axisCenters.forEach((center) => {
+    const delta = center.center - referenceValue;
+    const deltaKey = ceilingAssessmentValueKey(delta);
+
+    if (seenShifts.has(deltaKey)) {
+      return;
+    }
+
+    const centerByValueKey = new Map();
+    let valid = true;
+
+    axisValues.forEach((value) => {
+      const shiftedValue = value + delta;
+      const match = findCenterMatch(axisCenters, shiftedValue);
+
+      if (!match) {
+        valid = false;
+        return;
+      }
+
+      centerByValueKey.set(ceilingAssessmentValueKey(value), match);
+    });
+
+    if (!valid) {
+      return;
+    }
+
+    seenShifts.add(deltaKey);
+    candidates.push({
+      delta,
+      centerByValueKey
+    });
+  });
+
+  return candidates.sort((a, b) => Math.abs(a.delta) - Math.abs(b.delta));
+}
+
+function getMinimumClearanceForCoordinates(room, coordinates) {
+  return coordinates.reduce((bestDistance, point) => {
+    const nextDistance = Math.min(point.x, room.length - point.x, point.y, room.width - point.y);
+    return Math.min(bestDistance, nextDistance);
+  }, Number.POSITIVE_INFINITY);
+}
+
+function createIncompatibleAssessment(reasonCode, reasonText, extra = {}) {
+  return {
+    enabled: true,
+    compatible: false,
+    reasonCode,
+    reasonText,
+    dx: 0,
+    dy: 0,
+    luminaireConflict: false,
+    wallClearance: null,
+    appliedCoordinates: extra.appliedCoordinates || null,
+    shiftApplied: false,
+    visualCheckNote: "Verifier visuellement la proximite luminaire / brasseur.",
+    ...extra
+  };
+}
+
+function assessOptionCeilingCompatibility(option, ceilingGrid) {
+  if (!ceilingGrid) {
+    return {
+      enabled: false,
+      compatible: true,
+      reasonCode: null,
+      reasonText: "",
+      dx: 0,
+      dy: 0,
+      luminaireConflict: false,
+      wallClearance: option.wallClearance,
+      appliedCoordinates: option.coordinates,
+      shiftApplied: false,
+      visualCheckNote: ""
+    };
+  }
+
+  const uniqueXValues = getUniqueCoordinateValues(option.coordinates.map((point) => point.x));
+  const uniqueYValues = getUniqueCoordinateValues(option.coordinates.map((point) => point.y));
+  const xShiftCandidates = buildAxisShiftCandidates(uniqueXValues, ceilingGrid.xAxis.centers);
+  const yShiftCandidates = buildAxisShiftCandidates(uniqueYValues, ceilingGrid.yAxis.centers);
+
+  if (xShiftCandidates.length === 0 || yShiftCandidates.length === 0) {
+    return createIncompatibleAssessment(
+      "rail-alignment",
+      "Aucun decalage global ne permet de faire tomber tous les centres sur des dalles du faux plafond.",
+      {
+        appliedCoordinates: option.coordinates
+      }
+    );
+  }
+
+  const combinedCandidates = [];
+  xShiftCandidates.forEach((xShift) => {
+    yShiftCandidates.forEach((yShift) => {
+      combinedCandidates.push({
+        dx: xShift.delta,
+        dy: yShift.delta,
+        distance: Math.hypot(xShift.delta, yShift.delta),
+        xShift,
+        yShift
+      });
+    });
+  });
+  combinedCandidates.sort((a, b) => a.distance - b.distance);
+
+  let sawLuminaireConflict = false;
+  let sawWallConflict = false;
+
+  for (const combinedCandidate of combinedCandidates) {
+    const appliedCoordinates = option.coordinates.map((point) => ({
+      x: point.x + combinedCandidate.dx,
+      y: point.y + combinedCandidate.dy
+    }));
+    const wallClearance = getMinimumClearanceForCoordinates(option.room, appliedCoordinates);
+
+    if (wallClearance + EPS < option.diameter) {
+      sawWallConflict = true;
+      continue;
+    }
+
+    let hasLuminaireConflict = false;
+
+    for (const point of option.coordinates) {
+      const xCenter =
+        combinedCandidate.xShift.centerByValueKey.get(ceilingAssessmentValueKey(point.x)) || null;
+      const yCenter =
+        combinedCandidate.yShift.centerByValueKey.get(ceilingAssessmentValueKey(point.y)) || null;
+
+      if (!xCenter || !yCenter) {
+        hasLuminaireConflict = true;
+        break;
+      }
+
+      const tileKey = `${xCenter.index}:${yCenter.index}`;
+      const tile = ceilingGrid.tileMap.get(tileKey);
+
+      if (tile?.hasLuminaire) {
+        hasLuminaireConflict = true;
+        break;
+      }
+    }
+
+    if (hasLuminaireConflict) {
+      sawLuminaireConflict = true;
+      continue;
+    }
+
+    return {
+      enabled: true,
+      compatible: true,
+      reasonCode: null,
+      reasonText:
+        Math.abs(combinedCandidate.dx) > EPS || Math.abs(combinedCandidate.dy) > EPS
+          ? "Les centres peuvent etre decales globalement pour tomber dans des dalles du faux plafond."
+          : "Les centres theoriques tombent deja dans des dalles du faux plafond.",
+      dx: combinedCandidate.dx,
+      dy: combinedCandidate.dy,
+      luminaireConflict: false,
+      wallClearance,
+      appliedCoordinates,
+      shiftApplied:
+        Math.abs(combinedCandidate.dx) > EPS || Math.abs(combinedCandidate.dy) > EPS,
+      visualCheckNote: "Verifier visuellement la proximite luminaire / brasseur."
+    };
+  }
+
+  if (sawLuminaireConflict) {
+    return createIncompatibleAssessment(
+      "luminaire-conflict",
+      "Les positions alignees sur les dalles disponibles tombent sur une ou plusieurs dalles de luminaire existantes.",
+      {
+        appliedCoordinates: option.coordinates,
+        luminaireConflict: true
+      }
+    );
+  }
+
+  if (sawWallConflict) {
+    return createIncompatibleAssessment(
+      "wall-conflict",
+      "Le decalage necessaire pour suivre le faux plafond fait passer au moins un centre trop pres d'un mur.",
+      {
+        appliedCoordinates: option.coordinates
+      }
+    );
+  }
+
+  return createIncompatibleAssessment(
+    "incompatible",
+    "Le faux plafond ne permet pas de trouver une variante globale compatible sur cette trame.",
+    {
+      appliedCoordinates: option.coordinates
+    }
+  );
 }
 
 // src/core/calepinage.js
@@ -1357,6 +1781,8 @@ function renderCatalog(dom, brasse2Models) {
 }
 
 // src/ui/planSvg.js
+const ROOM_CORNER_RADIUS = 6;
+
 function svgLabelBox(x, y, label, anchor = "middle", fontSize = 10.5) {
   const textWidth = Math.max(54, label.length * (fontSize * 0.6));
   let rectX = x - textWidth / 2 - 6;
@@ -1436,11 +1862,10 @@ function svgFanSymbol(cx, cy, radius, index) {
   `;
 }
 
-function getPlanCanvasMetrics(candidate) {
+function getPlanCanvasMetrics(item) {
   const roomAspectRatio =
-    Math.max(candidate.room.length, candidate.room.width) /
-    Math.min(candidate.room.length, candidate.room.width);
-  const rotateForFit = roomAspectRatio >= 2.2 && candidate.room.length > candidate.room.width;
+    Math.max(item.room.length, item.room.width) / Math.min(item.room.length, item.room.width);
+  const rotateForFit = roomAspectRatio >= 2.2 && item.room.length > item.room.width;
 
   if (rotateForFit) {
     return {
@@ -1471,219 +1896,458 @@ function getPlanCanvasMetrics(candidate) {
   };
 }
 
-function planWrapStyle(candidate) {
-  const { wrapMinHeight } = getPlanCanvasMetrics(candidate);
+function planWrapStyle(item) {
+  const { wrapMinHeight } = getPlanCanvasMetrics(item);
   return `--plan-min-height:${wrapMinHeight}px;`;
 }
 
-function svgForCandidate(candidate) {
-  const { roomAspectRatio, rotateForFit, canvasWidth, canvasHeight } = getPlanCanvasMetrics(candidate);
+function buildPlanGeometry(room) {
+  const { roomAspectRatio, rotateForFit, canvasWidth, canvasHeight } = getPlanCanvasMetrics({ room });
   const paddingX = 28;
   const paddingY = 28;
-  const displayRoomLength = rotateForFit ? candidate.room.width : candidate.room.length;
-  const displayRoomHeight = rotateForFit ? candidate.room.length : candidate.room.width;
+  const displayRoomLength = rotateForFit ? room.width : room.length;
+  const displayRoomHeight = rotateForFit ? room.length : room.width;
   const scale = Math.min(
     (canvasWidth - paddingX * 2) / displayRoomLength,
     (canvasHeight - paddingY * 2) / displayRoomHeight
   );
-  const width = canvasWidth;
-  const height = canvasHeight;
   const roomWidth = displayRoomLength * scale;
   const roomHeight = displayRoomHeight * scale;
   const roomX = (canvasWidth - roomWidth) / 2;
   const roomY = (canvasHeight - roomHeight) / 2;
-  const compactMode = roomAspectRatio >= 2.4;
-  const labelFontSize = compactMode ? 9.2 : 10.5;
-  const compactOffset = compactMode ? 2 : 0;
-  const displayCoordinates = candidate.coordinates.map((point) =>
-    rotateForFit ? { x: point.y, y: point.x } : { x: point.x, y: point.y }
-  );
-  const displayCellLength = rotateForFit ? candidate.cellWidth : candidate.cellLength;
-  const displayCellHeight = rotateForFit ? candidate.cellLength : candidate.cellWidth;
-  const displayNx = rotateForFit ? candidate.ny : candidate.nx;
-  const displayNy = rotateForFit ? candidate.nx : candidate.ny;
 
-  const gridLines = [];
-  for (let i = 1; i < displayNx; i += 1) {
-    const x = roomX + i * displayCellLength * scale;
-    gridLines.push(
-      `<line x1="${x}" y1="${roomY}" x2="${x}" y2="${roomY + roomHeight}" stroke="rgba(29,47,44,0.18)" stroke-dasharray="6 5" />`
-    );
-  }
-  for (let j = 1; j < displayNy; j += 1) {
-    const y = roomY + j * displayCellHeight * scale;
-    gridLines.push(
-      `<line x1="${roomX}" y1="${y}" x2="${roomX + roomWidth}" y2="${y}" stroke="rgba(29,47,44,0.18)" stroke-dasharray="6 5" />`
-    );
+  return {
+    roomAspectRatio,
+    rotateForFit,
+    width: canvasWidth,
+    height: canvasHeight,
+    roomX,
+    roomY,
+    roomWidth,
+    roomHeight,
+    scale,
+    displayRoomLength,
+    displayRoomHeight,
+    compactMode: roomAspectRatio >= 2.4,
+    labelFontSize: roomAspectRatio >= 2.4 ? 9.2 : 10.5,
+    compactOffset: roomAspectRatio >= 2.4 ? 2 : 0,
+    projectPoint(point) {
+      const displayPoint = rotateForFit ? { x: point.y, y: point.x } : point;
+      return {
+        x: roomX + displayPoint.x * scale,
+        y: roomY + displayPoint.y * scale
+      };
+    },
+    projectRect(rectangle) {
+      const minPoint = rotateForFit
+        ? { x: rectangle.minY, y: rectangle.minX }
+        : { x: rectangle.minX, y: rectangle.minY };
+      const maxPoint = rotateForFit
+        ? { x: rectangle.maxY, y: rectangle.maxX }
+        : { x: rectangle.maxX, y: rectangle.maxY };
+
+      return {
+        x: roomX + Math.min(minPoint.x, maxPoint.x) * scale,
+        y: roomY + Math.min(minPoint.y, maxPoint.y) * scale,
+        width: Math.abs(maxPoint.x - minPoint.x) * scale,
+        height: Math.abs(maxPoint.y - minPoint.y) * scale
+      };
+    }
+  };
+}
+
+function getRenderedCoordinates(item) {
+  const ceilingAssessment = item.ceilingAssessment;
+
+  if (ceilingAssessment?.enabled && ceilingAssessment.compatible && ceilingAssessment.appliedCoordinates) {
+    return ceilingAssessment.appliedCoordinates;
   }
 
-  const fans = displayCoordinates
-    .map((point, index) => {
-      const cx = roomX + point.x * scale;
-      const cy = roomY + point.y * scale;
-      const r = (candidate.diameter / 2) * scale;
-      return svgFanSymbol(cx, cy, r, index);
+  return item.coordinates;
+}
+
+function renderCeilingOverlay(geometry, ceilingGrid) {
+  if (!ceilingGrid) {
+    return "";
+  }
+
+  return ceilingGrid.tiles
+    .map((tile) => {
+      const rectangle = geometry.projectRect(tile);
+      const fill = tile.hasLuminaire
+        ? "rgba(184,109,33,0.22)"
+        : tile.isCut
+          ? "rgba(29,47,44,0.05)"
+          : "rgba(255,255,255,0.28)";
+      const stroke = tile.hasLuminaire ? "rgba(184,109,33,0.64)" : "rgba(29,47,44,0.12)";
+
+      return `
+        <rect
+          x="${rectangle.x}"
+          y="${rectangle.y}"
+          width="${rectangle.width}"
+          height="${rectangle.height}"
+          rx="6"
+          fill="${fill}"
+          stroke="${stroke}"
+          stroke-width="${tile.hasLuminaire ? 1.3 : 1}"
+        />
+      `;
     })
     .join("");
+}
+
+function renderTheoreticalGhostCenters(geometry, item, displayCoordinates) {
+  const assessment = item.ceilingAssessment;
+
+  if (!assessment?.compatible || !assessment.shiftApplied) {
+    return "";
+  }
+
+  return item.coordinates
+    .map((point, index) => {
+      const renderedPoint = geometry.projectPoint(point);
+      const shiftedPoint = geometry.projectPoint(displayCoordinates[index]);
+      return `
+        <g>
+          <line
+            x1="${renderedPoint.x}"
+            y1="${renderedPoint.y}"
+            x2="${shiftedPoint.x}"
+            y2="${shiftedPoint.y}"
+            stroke="rgba(107,114,128,0.5)"
+            stroke-width="1.2"
+            stroke-dasharray="4 4"
+          />
+          <circle cx="${renderedPoint.x}" cy="${renderedPoint.y}" r="3.2" fill="rgba(107,114,128,0.65)" />
+        </g>
+      `;
+    })
+    .join("");
+}
+
+function renderUniformGrid(geometry, item) {
+  const displayCellLength = geometry.rotateForFit ? item.cellWidth : item.cellLength;
+  const displayCellHeight = geometry.rotateForFit ? item.cellLength : item.cellWidth;
+  const displayNx = geometry.rotateForFit ? item.ny : item.nx;
+  const displayNy = geometry.rotateForFit ? item.nx : item.ny;
+  const gridLines = [];
+
+  for (let index = 1; index < displayNx; index += 1) {
+    const x = geometry.roomX + index * displayCellLength * geometry.scale;
+    gridLines.push(
+      `<line x1="${x}" y1="${geometry.roomY}" x2="${x}" y2="${geometry.roomY + geometry.roomHeight}" stroke="rgba(29,47,44,0.18)" stroke-dasharray="6 5" />`
+    );
+  }
+
+  for (let index = 1; index < displayNy; index += 1) {
+    const y = geometry.roomY + index * displayCellHeight * geometry.scale;
+    gridLines.push(
+      `<line x1="${geometry.roomX}" y1="${y}" x2="${geometry.roomX + geometry.roomWidth}" y2="${y}" stroke="rgba(29,47,44,0.18)" stroke-dasharray="6 5" />`
+    );
+  }
+
+  return gridLines.join("");
+}
+
+function renderFans(geometry, item, displayCoordinates) {
+  return displayCoordinates
+    .map((point, index) => {
+      const renderedPoint = geometry.projectPoint(point);
+      const radius = (item.diameter / 2) * geometry.scale;
+      return svgFanSymbol(renderedPoint.x, renderedPoint.y, radius, index);
+    })
+    .join("");
+}
+
+function getNearestWallMeasurement(room, point) {
+  return [
+    { axis: "x", boundary: 0, clearance: point.x },
+    { axis: "x", boundary: room.length, clearance: room.length - point.x },
+    { axis: "y", boundary: 0, clearance: point.y },
+    { axis: "y", boundary: room.width, clearance: room.width - point.y }
+  ].sort((a, b) => a.clearance - b.clearance)[0];
+}
+
+function renderCandidateMeasurements(geometry, candidate, displayCoordinates) {
+  if (displayCoordinates.length === 0) {
+    return "";
+  }
 
   const firstPoint = displayCoordinates[0];
-  const firstCx = roomX + firstPoint.x * scale;
-  const firstCy = roomY + firstPoint.y * scale;
-  const radius = (candidate.diameter / 2) * scale;
+  const firstRenderedPoint = geometry.projectPoint(firstPoint);
+  const radius = (candidate.diameter / 2) * geometry.scale;
   const measurements = [];
 
   measurements.push(
     svgDimensionLine(
-      firstCx - radius,
-      firstCy - radius - (compactMode ? 8 : 12),
-      firstCx + radius,
-      firstCy - radius - (compactMode ? 8 : 12),
+      firstRenderedPoint.x - radius,
+      firstRenderedPoint.y - radius - (geometry.compactMode ? 8 : 12),
+      firstRenderedPoint.x + radius,
+      firstRenderedPoint.y - radius - (geometry.compactMode ? 8 : 12),
       `D ${formatMeters(candidate.diameter)}`,
       "middle",
       0,
-      compactMode ? -6 : -8,
-      labelFontSize
+      geometry.compactMode ? -6 : -8,
+      geometry.labelFontSize
     )
   );
 
-  if (firstPoint.x <= firstPoint.y) {
+  const nearestWall = getNearestWallMeasurement(candidate.room, firstPoint);
+  const displayedWallClearance =
+    candidate.ceilingAssessment?.wallClearance || candidate.wallClearance;
+
+  if (nearestWall.axis === "x") {
+    const wallX = nearestWall.boundary === 0 ? geometry.roomX : geometry.roomX + geometry.roomWidth;
+    const lineY = Math.min(
+      geometry.height - 14,
+      firstRenderedPoint.y + radius + (geometry.compactMode ? 12 : 16)
+    );
+
     measurements.push(
       svgDimensionLine(
-        roomX,
-        Math.min(height - 14, firstCy + radius + (compactMode ? 12 : 16)),
-        firstCx,
-        Math.min(height - 14, firstCy + radius + (compactMode ? 12 : 16)),
-        `Mur ${formatMeters(firstPoint.x)}`,
+        wallX,
+        lineY,
+        firstRenderedPoint.x,
+        lineY,
+        `Mur ${formatMeters(displayedWallClearance)}`,
         "middle",
         0,
-        compactMode ? -6 : -8,
-        labelFontSize
+        geometry.compactMode ? -6 : -8,
+        geometry.labelFontSize
       )
     );
   } else {
+    const wallY = nearestWall.boundary === 0 ? geometry.roomY : geometry.roomY + geometry.roomHeight;
+    const lineX = Math.min(
+      geometry.width - 16,
+      firstRenderedPoint.x + radius + (geometry.compactMode ? 12 : 16)
+    );
+
     measurements.push(
       svgDimensionLine(
-        Math.min(width - 16, firstCx + radius + (compactMode ? 12 : 16)),
-        roomY,
-        Math.min(width - 16, firstCx + radius + (compactMode ? 12 : 16)),
-        firstCy,
-        `Mur ${formatMeters(firstPoint.y)}`,
+        lineX,
+        wallY,
+        lineX,
+        firstRenderedPoint.y,
+        `Mur ${formatMeters(displayedWallClearance)}`,
         "start",
-        8 + compactOffset,
+        8 + geometry.compactOffset,
         -2,
-        labelFontSize
+        geometry.labelFontSize
       )
     );
   }
 
   if (candidate.interFanSpacing) {
+    const displayCellLength = geometry.rotateForFit ? candidate.cellWidth : candidate.cellLength;
+    const displayCellHeight = geometry.rotateForFit ? candidate.cellLength : candidate.cellWidth;
+    const displayNx = geometry.rotateForFit ? candidate.ny : candidate.nx;
+    const displayNy = geometry.rotateForFit ? candidate.nx : candidate.ny;
     const horizontalSpacing = displayNx > 1 ? displayCellLength : Number.POSITIVE_INFINITY;
     const verticalSpacing = displayNy > 1 ? displayCellHeight : Number.POSITIVE_INFINITY;
 
     if (horizontalSpacing <= verticalSpacing) {
-      const secondCx = roomX + (firstPoint.x + displayCellLength) * scale;
-      const lineY = Math.max(roomY + 10, firstCy - radius - (compactMode ? 26 : 34));
+      const secondRenderedPoint = geometry.projectPoint({
+        x: firstPoint.x + displayCellLength,
+        y: firstPoint.y
+      });
+      const lineY = Math.max(
+        geometry.roomY + 10,
+        firstRenderedPoint.y - radius - (geometry.compactMode ? 26 : 34)
+      );
       measurements.push(
         svgDimensionLine(
-          firstCx,
+          firstRenderedPoint.x,
           lineY,
-          secondCx,
+          secondRenderedPoint.x,
           lineY,
-          `Entraxe ${formatMeters(displayCellLength)}`,
+          `Entraxe ${formatMeters(candidate.interFanSpacing)}`,
           "middle",
           0,
-          compactMode ? -6 : -8,
-          labelFontSize
+          geometry.compactMode ? -6 : -8,
+          geometry.labelFontSize
         )
       );
     } else {
-      const secondCy = roomY + (firstPoint.y + displayCellHeight) * scale;
-      const lineX = Math.min(width - 12, firstCx + radius + (compactMode ? 24 : 32));
+      const secondRenderedPoint = geometry.projectPoint({
+        x: firstPoint.x,
+        y: firstPoint.y + displayCellHeight
+      });
+      const lineX = Math.min(
+        geometry.width - 12,
+        firstRenderedPoint.x + radius + (geometry.compactMode ? 24 : 32)
+      );
       measurements.push(
         svgDimensionLine(
           lineX,
-          firstCy,
+          firstRenderedPoint.y,
           lineX,
-          secondCy,
-          `Entraxe ${formatMeters(displayCellHeight)}`,
+          secondRenderedPoint.y,
+          `Entraxe ${formatMeters(candidate.interFanSpacing)}`,
           "start",
-          8 + compactOffset,
+          8 + geometry.compactOffset,
           -2,
-          labelFontSize
+          geometry.labelFontSize
         )
       );
     }
   }
 
+  return measurements.join("");
+}
+
+function renderVariabilityMeasurements(geometry, design, displayCoordinates) {
+  if (displayCoordinates.length === 0) {
+    return "";
+  }
+
+  const measurements = [];
+  const firstPoint = displayCoordinates[0];
+  const firstRenderedPoint = geometry.projectPoint(firstPoint);
+  const radius = (design.diameter / 2) * geometry.scale;
+
+  measurements.push(
+    svgDimensionLine(
+      firstRenderedPoint.x - radius,
+      firstRenderedPoint.y - radius - (geometry.compactMode ? 8 : 12),
+      firstRenderedPoint.x + radius,
+      firstRenderedPoint.y - radius - (geometry.compactMode ? 8 : 12),
+      `D ${formatMeters(design.diameter)}`,
+      "middle",
+      0,
+      geometry.compactMode ? -6 : -8,
+      geometry.labelFontSize
+    )
+  );
+
+  const displayedWallClearance = design.ceilingAssessment?.wallClearance || design.wallClearance;
+  let closestPoint = displayCoordinates
+    .map((point) => ({
+      point,
+      nearestWall: getNearestWallMeasurement(design.room, point)
+    }))
+    .sort((a, b) => a.nearestWall.clearance - b.nearestWall.clearance)[0];
+
+  if (!design.ceilingAssessment?.shiftApplied && design.minimumWallCellKey) {
+    const wallCellIndex = design.selectedCells.findIndex((cell) => cell.key === design.minimumWallCellKey);
+    if (wallCellIndex >= 0) {
+      closestPoint = {
+        point: displayCoordinates[wallCellIndex],
+        nearestWall: getNearestWallMeasurement(design.room, displayCoordinates[wallCellIndex])
+      };
+    }
+  }
+
+  const renderedClosestPoint = geometry.projectPoint(closestPoint.point);
+
+  if (closestPoint.nearestWall.axis === "x") {
+    const wallX =
+      closestPoint.nearestWall.boundary === 0
+        ? geometry.roomX
+        : geometry.roomX + geometry.roomWidth;
+    const lineY = Math.min(
+      geometry.height - 14,
+      renderedClosestPoint.y + (geometry.compactMode ? 20 : 24)
+    );
+    measurements.push(
+      svgDimensionLine(
+        wallX,
+        lineY,
+        renderedClosestPoint.x,
+        lineY,
+        `Mur ${formatMeters(displayedWallClearance)}`,
+        "middle",
+        0,
+        geometry.compactMode ? -6 : -8,
+        geometry.labelFontSize
+      )
+    );
+  } else {
+    const wallY =
+      closestPoint.nearestWall.boundary === 0
+        ? geometry.roomY
+        : geometry.roomY + geometry.roomHeight;
+    const lineX = Math.min(
+      geometry.width - 12,
+      renderedClosestPoint.x + (geometry.compactMode ? 20 : 24)
+    );
+    measurements.push(
+      svgDimensionLine(
+        lineX,
+        wallY,
+        lineX,
+        renderedClosestPoint.y,
+        `Mur ${formatMeters(displayedWallClearance)}`,
+        "start",
+        8 + geometry.compactOffset,
+        -2,
+        geometry.labelFontSize
+      )
+    );
+  }
+
+  if (design.interFanSpacing) {
+    let firstSpacingPoint = displayCoordinates[0];
+    let secondSpacingPoint = displayCoordinates[1] || displayCoordinates[0];
+
+    if (design.minimumSpacingPair) {
+      const firstIndex = design.selectedCells.findIndex((cell) => cell.key === design.minimumSpacingPair[0]);
+      const secondIndex = design.selectedCells.findIndex((cell) => cell.key === design.minimumSpacingPair[1]);
+
+      if (firstIndex >= 0 && secondIndex >= 0) {
+        firstSpacingPoint = displayCoordinates[firstIndex];
+        secondSpacingPoint = displayCoordinates[secondIndex];
+      }
+    }
+
+    const firstRenderedSpacingPoint = geometry.projectPoint(firstSpacingPoint);
+    const secondRenderedSpacingPoint = geometry.projectPoint(secondSpacingPoint);
+
+    measurements.push(
+      svgDimensionLine(
+        firstRenderedSpacingPoint.x,
+        firstRenderedSpacingPoint.y,
+        secondRenderedSpacingPoint.x,
+        secondRenderedSpacingPoint.y,
+        `Entraxe ${formatMeters(design.interFanSpacing)}`,
+        "middle",
+        0,
+        geometry.compactMode ? -10 : -12,
+        geometry.labelFontSize
+      )
+    );
+  }
+
+  return measurements.join("");
+}
+
+function svgForCandidate(candidate) {
+  const geometry = buildPlanGeometry(candidate.room);
+  const displayCoordinates = getRenderedCoordinates(candidate);
+  const fans = renderFans(geometry, candidate, displayCoordinates);
+  const theoreticalGhosts = renderTheoreticalGhostCenters(geometry, candidate, displayCoordinates);
+  const measurements = renderCandidateMeasurements(geometry, candidate, displayCoordinates);
+
   return `
-    <svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
-      <rect x="${roomX}" y="${roomY}" width="${roomWidth}" height="${roomHeight}" rx="18" fill="#faf5eb" stroke="rgba(29,47,44,0.2)" stroke-width="2.5" />
-      ${gridLines.join("")}
+    <svg viewBox="0 0 ${geometry.width} ${geometry.height}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+      <rect x="${geometry.roomX}" y="${geometry.roomY}" width="${geometry.roomWidth}" height="${geometry.roomHeight}" rx="${ROOM_CORNER_RADIUS}" fill="#faf5eb" stroke="rgba(29,47,44,0.2)" stroke-width="2.5" />
+      ${renderCeilingOverlay(geometry, candidate.ceilingGrid)}
+      ${renderUniformGrid(geometry, candidate)}
+      ${theoreticalGhosts}
       ${fans}
-      ${measurements.join("")}
+      ${measurements}
     </svg>
   `;
 }
 
 function svgForVariabilityDesign(design) {
-  const { roomAspectRatio, rotateForFit, canvasWidth, canvasHeight } = getPlanCanvasMetrics(design);
-  const paddingX = 28;
-  const paddingY = 28;
-  const displayRoomLength = rotateForFit ? design.room.width : design.room.length;
-  const displayRoomHeight = rotateForFit ? design.room.length : design.room.width;
-  const scale = Math.min(
-    (canvasWidth - paddingX * 2) / displayRoomLength,
-    (canvasHeight - paddingY * 2) / displayRoomHeight
-  );
-  const width = canvasWidth;
-  const height = canvasHeight;
-  const roomWidth = displayRoomLength * scale;
-  const roomHeight = displayRoomHeight * scale;
-  const roomX = (canvasWidth - roomWidth) / 2;
-  const roomY = (canvasHeight - roomHeight) / 2;
-  const compactMode = roomAspectRatio >= 2.4;
-  const labelFontSize = compactMode ? 9.2 : 10.5;
-  const compactOffset = compactMode ? 2 : 0;
-  const displayCellLength = rotateForFit ? design.cellWidth : design.cellLength;
-  const displayCellHeight = rotateForFit ? design.cellLength : design.cellWidth;
-  const displayNx = rotateForFit ? design.ny : design.nx;
-  const displayNy = rotateForFit ? design.nx : design.ny;
-  const transformPoint = (point) => (rotateForFit ? { x: point.y, y: point.x } : { x: point.x, y: point.y });
-  const transformRect = (rectangle) => {
-    const minPoint = transformPoint({ x: rectangle.minX, y: rectangle.minY });
-    const maxPoint = transformPoint({ x: rectangle.maxX, y: rectangle.maxY });
-
-    return {
-      x: roomX + Math.min(minPoint.x, maxPoint.x) * scale,
-      y: roomY + Math.min(minPoint.y, maxPoint.y) * scale,
-      width: Math.abs(maxPoint.x - minPoint.x) * scale,
-      height: Math.abs(maxPoint.y - minPoint.y) * scale
-    };
-  };
-
-  const displaySelectedCells = design.selectedCells.map((cell) => ({
-    ...cell,
-    displayCenter: transformPoint({ x: cell.centerX, y: cell.centerY }),
-    displayRect: transformRect(cell)
-  }));
-
-  const gridLines = [];
-  for (let i = 1; i < displayNx; i += 1) {
-    const x = roomX + i * displayCellLength * scale;
-    gridLines.push(
-      `<line x1="${x}" y1="${roomY}" x2="${x}" y2="${roomY + roomHeight}" stroke="rgba(29,47,44,0.18)" stroke-dasharray="6 5" />`
-    );
-  }
-  for (let j = 1; j < displayNy; j += 1) {
-    const y = roomY + j * displayCellHeight * scale;
-    gridLines.push(
-      `<line x1="${roomX}" y1="${y}" x2="${roomX + roomWidth}" y2="${y}" stroke="rgba(29,47,44,0.18)" stroke-dasharray="6 5" />`
-    );
-  }
+  const geometry = buildPlanGeometry(design.room);
+  const displayCoordinates = getRenderedCoordinates(design);
 
   const zoneShapes = design.targetZones
     .map((zone, index) => {
-      const rectangle = transformRect(zone);
+      const rectangle = geometry.projectRect(zone);
       return `
         <g>
           <rect x="${rectangle.x}" y="${rectangle.y}" width="${rectangle.width}" height="${rectangle.height}" rx="10"
@@ -1694,120 +2358,174 @@ function svgForVariabilityDesign(design) {
     })
     .join("");
 
-  const selectedCellShapes = displaySelectedCells
-    .map(
-      (cell) => `
-        <rect x="${cell.displayRect.x}" y="${cell.displayRect.y}" width="${cell.displayRect.width}" height="${cell.displayRect.height}" rx="8"
+  const selectedCellShapes = design.selectedCells
+    .map((cell) => {
+      const rectangle = geometry.projectRect(cell);
+      return `
+        <rect x="${rectangle.x}" y="${rectangle.y}" width="${rectangle.width}" height="${rectangle.height}" rx="8"
           fill="rgba(31,79,130,0.10)" stroke="rgba(31,79,130,0.38)" stroke-width="1.4" />
-      `
-    )
-    .join("");
-
-  const fans = displaySelectedCells
-    .map((cell, index) => {
-      const cx = roomX + cell.displayCenter.x * scale;
-      const cy = roomY + cell.displayCenter.y * scale;
-      const r = (design.diameter / 2) * scale;
-      return svgFanSymbol(cx, cy, r, index);
+      `;
     })
     .join("");
 
-  const measurements = [];
-  const firstCell = displaySelectedCells[0];
-  if (firstCell) {
-    const firstCx = roomX + firstCell.displayCenter.x * scale;
-    const firstCy = roomY + firstCell.displayCenter.y * scale;
-    const radius = (design.diameter / 2) * scale;
-    measurements.push(
-      svgDimensionLine(
-        firstCx - radius,
-        firstCy - radius - (compactMode ? 8 : 12),
-        firstCx + radius,
-        firstCy - radius - (compactMode ? 8 : 12),
-        `D ${formatMeters(design.diameter)}`,
-        "middle",
-        0,
-        compactMode ? -6 : -8,
-        labelFontSize
-      )
+  const fans = renderFans(geometry, design, displayCoordinates);
+  const theoreticalGhosts = renderTheoreticalGhostCenters(geometry, design, displayCoordinates);
+  const measurements = renderVariabilityMeasurements(geometry, design, displayCoordinates);
+  const displayCellLength = geometry.rotateForFit ? design.cellWidth : design.cellLength;
+  const displayCellHeight = geometry.rotateForFit ? design.cellLength : design.cellWidth;
+  const displayNx = geometry.rotateForFit ? design.ny : design.nx;
+  const displayNy = geometry.rotateForFit ? design.nx : design.ny;
+  const gridLines = [];
+
+  for (let index = 1; index < displayNx; index += 1) {
+    const x = geometry.roomX + index * displayCellLength * geometry.scale;
+    gridLines.push(
+      `<line x1="${x}" y1="${geometry.roomY}" x2="${x}" y2="${geometry.roomY + geometry.roomHeight}" stroke="rgba(29,47,44,0.18)" stroke-dasharray="6 5" />`
     );
   }
 
-  if (design.minimumWallCellKey) {
-    const wallCell = displaySelectedCells.find((cell) => cell.key === design.minimumWallCellKey);
-    if (wallCell) {
-      const cx = roomX + wallCell.displayCenter.x * scale;
-      const cy = roomY + wallCell.displayCenter.y * scale;
-      const distances = [
-        { axis: "x", boundary: roomX, value: wallCell.displayCenter.x },
-        { axis: "x", boundary: roomX + roomWidth, value: displayRoomLength - wallCell.displayCenter.x },
-        { axis: "y", boundary: roomY, value: wallCell.displayCenter.y },
-        { axis: "y", boundary: roomY + roomHeight, value: displayRoomHeight - wallCell.displayCenter.y }
-      ].sort((a, b) => a.value - b.value);
-      const nearest = distances[0];
-
-      if (nearest.axis === "x") {
-        measurements.push(
-          svgDimensionLine(
-            nearest.boundary,
-            Math.min(height - 14, cy + (compactMode ? 20 : 24)),
-            cx,
-            Math.min(height - 14, cy + (compactMode ? 20 : 24)),
-            `Mur ${formatMeters(design.wallClearance)}`,
-            "middle",
-            0,
-            compactMode ? -6 : -8,
-            labelFontSize
-          )
-        );
-      } else {
-        measurements.push(
-          svgDimensionLine(
-            Math.min(width - 12, cx + (compactMode ? 20 : 24)),
-            nearest.boundary,
-            Math.min(width - 12, cx + (compactMode ? 20 : 24)),
-            cy,
-            `Mur ${formatMeters(design.wallClearance)}`,
-            "start",
-            8 + compactOffset,
-            -2,
-            labelFontSize
-          )
-        );
-      }
-    }
-  }
-
-  if (design.minimumSpacingPair) {
-    const firstSpacingCell = displaySelectedCells.find((cell) => cell.key === design.minimumSpacingPair[0]);
-    const secondSpacingCell = displaySelectedCells.find((cell) => cell.key === design.minimumSpacingPair[1]);
-    if (firstSpacingCell && secondSpacingCell) {
-      measurements.push(
-        svgDimensionLine(
-          roomX + firstSpacingCell.displayCenter.x * scale,
-          roomY + firstSpacingCell.displayCenter.y * scale,
-          roomX + secondSpacingCell.displayCenter.x * scale,
-          roomY + secondSpacingCell.displayCenter.y * scale,
-          `Entraxe ${formatMeters(design.interFanSpacing)}`,
-          "middle",
-          0,
-          compactMode ? -10 : -12,
-          labelFontSize
-        )
-      );
-    }
+  for (let index = 1; index < displayNy; index += 1) {
+    const y = geometry.roomY + index * displayCellHeight * geometry.scale;
+    gridLines.push(
+      `<line x1="${geometry.roomX}" y1="${y}" x2="${geometry.roomX + geometry.roomWidth}" y2="${y}" stroke="rgba(29,47,44,0.18)" stroke-dasharray="6 5" />`
+    );
   }
 
   return `
-    <svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
-      <rect x="${roomX}" y="${roomY}" width="${roomWidth}" height="${roomHeight}" rx="18" fill="#faf5eb" stroke="rgba(29,47,44,0.2)" stroke-width="2.5" />
+    <svg viewBox="0 0 ${geometry.width} ${geometry.height}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+      <rect x="${geometry.roomX}" y="${geometry.roomY}" width="${geometry.roomWidth}" height="${geometry.roomHeight}" rx="${ROOM_CORNER_RADIUS}" fill="#faf5eb" stroke="rgba(29,47,44,0.2)" stroke-width="2.5" />
+      ${renderCeilingOverlay(geometry, design.ceilingGrid)}
       ${gridLines.join("")}
       ${zoneShapes}
       ${selectedCellShapes}
+      ${theoreticalGhosts}
       ${fans}
-      ${measurements.join("")}
+      ${measurements}
     </svg>
   `;
+}
+
+// src/ui/ceilingEditor.js
+const CEILING_EDITOR_ROOM_CORNER_RADIUS = 6;
+
+function buildCeilingEditorGeometry(room) {
+  const { rotateForFit, canvasWidth, canvasHeight } = getPlanCanvasMetrics({ room });
+  const paddingX = 28;
+  const paddingY = 28;
+  const displayRoomLength = rotateForFit ? room.width : room.length;
+  const displayRoomHeight = rotateForFit ? room.length : room.width;
+  const scale = Math.min(
+    (canvasWidth - paddingX * 2) / displayRoomLength,
+    (canvasHeight - paddingY * 2) / displayRoomHeight
+  );
+  const roomWidth = displayRoomLength * scale;
+  const roomHeight = displayRoomHeight * scale;
+  const roomX = (canvasWidth - roomWidth) / 2;
+  const roomY = (canvasHeight - roomHeight) / 2;
+
+  return {
+    rotateForFit,
+    width: canvasWidth,
+    height: canvasHeight,
+    scale,
+    roomWidth,
+    roomHeight,
+    roomX,
+    roomY,
+    projectRect(rectangle) {
+      const minX = rotateForFit ? rectangle.minY : rectangle.minX;
+      const maxX = rotateForFit ? rectangle.maxY : rectangle.maxX;
+      const minY = rotateForFit ? rectangle.minX : rectangle.minY;
+      const maxY = rotateForFit ? rectangle.maxX : rectangle.maxY;
+
+      return {
+        x: roomX + Math.min(minX, maxX) * scale,
+        y: roomY + Math.min(minY, maxY) * scale,
+        width: Math.abs(maxX - minX) * scale,
+        height: Math.abs(maxY - minY) * scale
+      };
+    }
+  };
+}
+
+function renderCeilingEditorSvg(room, ceilingGrid) {
+  const geometry = buildCeilingEditorGeometry(room);
+  const tileShapes = ceilingGrid.tiles
+    .map((tile) => {
+      const rectangle = geometry.projectRect(tile);
+      const fill = tile.hasLuminaire
+        ? "rgba(184,109,33,0.28)"
+        : tile.isCut
+          ? "rgba(29,47,44,0.06)"
+          : "rgba(255,255,255,0.88)";
+      const stroke = tile.hasLuminaire ? "rgba(184,109,33,0.72)" : "rgba(29,47,44,0.14)";
+
+      return `
+        <rect
+          x="${rectangle.x}"
+          y="${rectangle.y}"
+          width="${rectangle.width}"
+          height="${rectangle.height}"
+          rx="6"
+          fill="${fill}"
+          stroke="${stroke}"
+          stroke-width="${tile.hasLuminaire ? 1.4 : 1}"
+          data-luminaire-tile-key="${tile.key}"
+          class="ceiling-editor-tile${tile.hasLuminaire ? " is-luminaire" : ""}"
+        />
+      `;
+    })
+    .join("");
+
+  return `
+    <svg viewBox="0 0 ${geometry.width} ${geometry.height}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+      <rect
+        x="${geometry.roomX}"
+        y="${geometry.roomY}"
+        width="${geometry.roomWidth}"
+        height="${geometry.roomHeight}"
+        rx="${CEILING_EDITOR_ROOM_CORNER_RADIUS}"
+        fill="#faf5eb"
+        stroke="rgba(29,47,44,0.2)"
+        stroke-width="2.5"
+      />
+      ${tileShapes}
+    </svg>
+  `;
+}
+
+function renderCeilingEditor(dom, state, room) {
+  const isEnabled = !!state.ceilingLayout.enabled;
+
+  dom.ceilingConfig.classList.toggle("hidden", !isEnabled);
+  dom.ceilingAnchorXInput.value = state.ceilingLayout.xAnchorMode;
+  dom.ceilingAnchorYInput.value = state.ceilingLayout.yAnchorMode;
+
+  if (!isEnabled) {
+    dom.ceilingEditorSummary.textContent = "";
+    dom.ceilingEditorCanvas.innerHTML = "";
+    dom.clearCeilingLuminairesButton.disabled = true;
+    return null;
+  }
+
+  const ceilingGrid = buildCeilingGrid(room, state.ceilingLayout);
+
+  if (!ceilingGrid) {
+    dom.ceilingEditorSummary.textContent = "";
+    dom.ceilingEditorCanvas.innerHTML = "";
+    dom.clearCeilingLuminairesButton.disabled = true;
+    return null;
+  }
+
+  dom.ceilingEditorSummary.innerHTML = `
+    ${ceilingGrid.tiles.length} dalles visibles, dont ${ceilingGrid.cutTilesCount} dalle${ceilingGrid.cutTilesCount > 1 ? "s" : ""} recoupée${ceilingGrid.cutTilesCount > 1 ? "s" : ""}.
+    ${ceilingGrid.luminairesCount} luminaire${ceilingGrid.luminairesCount > 1 ? "s" : ""} placé${ceilingGrid.luminairesCount > 1 ? "s" : ""}.
+    Piece ${formatMeters(room.length)} × ${formatMeters(room.width)} (${formatSquareMeters(room.length * room.width)}).
+  `;
+  dom.ceilingEditorCanvas.innerHTML = renderCeilingEditorSvg(room, ceilingGrid);
+  dom.clearCeilingLuminairesButton.disabled = ceilingGrid.luminairesCount === 0;
+
+  return ceilingGrid;
 }
 
 // src/ui/reportHeader.js
@@ -2085,6 +2803,53 @@ function renderModelCard(title, model) {
   `;
 }
 
+function formatCeilingShiftLabel(assessment) {
+  if (!assessment?.shiftApplied) {
+    return "Aucun decalage";
+  }
+
+  return `${formatNumber(assessment.dx * 100, 0)} cm / ${formatNumber(assessment.dy * 100, 0)} cm`;
+}
+
+function renderCeilingDetailItems(item) {
+  const assessment = item.ceilingAssessment;
+
+  if (!assessment?.enabled) {
+    return "";
+  }
+
+  return `
+    <div class="detail-item">
+      <strong>Compatibilite faux plafond</strong>
+      <span>${assessment.compatible ? "Compatible" : "Non compatible"}</span>
+    </div>
+    <div class="detail-item">
+      <strong>Decalage de trame</strong>
+      <span>${formatCeilingShiftLabel(assessment)}</span>
+    </div>
+    <div class="detail-item">
+      <strong>Conflit luminaire</strong>
+      <span>${assessment.luminaireConflict ? "Oui" : "Non"}</span>
+    </div>
+  `;
+}
+
+function renderCeilingNotice(item) {
+  const assessment = item.ceilingAssessment;
+
+  if (!assessment?.enabled) {
+    return "";
+  }
+
+  return `
+    <div class="notice ${assessment.compatible ? "warning" : "danger"}">
+      <strong>${assessment.compatible ? "Lecture faux plafond." : "Faux plafond non compatible."}</strong>
+      ${assessment.reasonText}
+      ${assessment.visualCheckNote ? ` ${assessment.visualCheckNote}` : ""}
+    </div>
+  `;
+}
+
 function renderModelsTable(models) {
   if (models.length === 0) {
     return `
@@ -2339,6 +3104,7 @@ function candidateCard(candidate, rank, brasse2Models, realDiameters, selectedOp
               <strong>Diametres BRASSE II admissibles (FCC &gt;= 0,2)</strong>
               <span>${candidate.compatibleRealDiameters.map((option) => formatDiameterCm(option.diameter)).join(", ")}</span>
             </div>
+            ${renderCeilingDetailItems(candidate)}
           </div>
         </div>
       </div>
@@ -2349,6 +3115,8 @@ function candidateCard(candidate, rank, brasse2Models, realDiameters, selectedOp
           ${warnings.join(" ")}
         </div>
       ` : ""}
+
+      ${renderCeilingNotice(candidate)}
 
       ${renderBrasse2Section(candidate, brasse2Models, realDiameters)}
 
@@ -2559,6 +3327,7 @@ function variabilityCard(design, rank, brasse2Models, realDiameters, selectedOpt
               <strong>Diametres BRASSE II admissibles (FCC &gt;= 0,2)</strong>
               <span>${formatDiameterCmList(design.compatibleRealDiameters)}</span>
             </div>
+            ${renderCeilingDetailItems(design)}
           </div>
         </div>
       </div>
@@ -2569,6 +3338,8 @@ function variabilityCard(design, rank, brasse2Models, realDiameters, selectedOpt
           ${warnings.join(" ")}
         </div>
       ` : ""}
+
+      ${renderCeilingNotice(design)}
 
       <div class="zone-results">
         ${design.zoneSummaries.map((zoneSummary) => renderVariabilityZoneSummary(zoneSummary)).join("")}
@@ -2907,7 +3678,7 @@ function renderSelectedOptionsOverview(state, selectedOptions) {
   if (selectedOptions.length === 0) {
     return `
       <section class="report-block">
-        <h2>Synthese de l'option retenue :</h2>
+        <h2>Synthese de ou des option(s) retenue(s) :</h2>
         <div class="report-note report-note-warning">
           <strong>Aucune option selectionnee</strong>
           <p>Cochez au moins une option dans l'outil pour l'inclure dans le rapport PDF.</p>
@@ -2927,7 +3698,7 @@ function renderSelectedOptionsOverview(state, selectedOptions) {
 
     return `
       <section class="report-block">
-        <h2>Synthese des options retenues :</h2>
+        <h2>Synthese de ou des option(s) retenue(s) :</h2>
         ${renderReportTable(
           ["Option", "Trame", "Diametre reel", "Montage", "FCC reel"],
           rows,
@@ -2948,7 +3719,7 @@ function renderSelectedOptionsOverview(state, selectedOptions) {
 
   return `
     <section class="report-block">
-      <h2>Synthese des options retenues :</h2>
+      <h2>Synthese de ou des option(s) retenue(s) :</h2>
       ${renderReportTable(
         ["Option", "Trame", "Cellules actives", "Diametre reel", "Montage", "Debordement"],
         rows,
@@ -3521,6 +4292,33 @@ function getRoomInputs() {
   };
 }
 
+function renderCeilingPanel() {
+  dom.ceilingEnabledInput.checked = state.ceilingLayout.enabled;
+  return renderCeilingEditor(dom, state, getCurrentRoomDraft(dom));
+}
+
+function getActiveCeilingGrid(room) {
+  if (!state.ceilingLayout.enabled) {
+    return null;
+  }
+
+  return buildCeilingGrid(room, state.ceilingLayout);
+}
+
+function attachCeilingAssessments(items, room) {
+  const ceilingGrid = getActiveCeilingGrid(room);
+
+  if (!ceilingGrid) {
+    return items;
+  }
+
+  return items.map((item) => ({
+    ...item,
+    ceilingGrid,
+    ceilingAssessment: assessOptionCeilingCompatibility(item, ceilingGrid)
+  }));
+}
+
 function toggleStrategyUI() {
   const isVariability = dom.strategyInput.value === "variabilite";
   dom.zonesConfig.classList.toggle("hidden", !isVariability);
@@ -3710,6 +4508,7 @@ function renderUniformityEmpty(room, fallbackFlush, generatedAt) {
 
 function render() {
   toggleStrategyUI();
+  renderCeilingPanel();
 
   const rawValues = {
     strategy: dom.strategyInput.value,
@@ -3739,7 +4538,10 @@ function render() {
     }
 
     const modes = getSelectedModes();
-    const designs = enumerateVariabilityDesigns(room, zones, modes, realDiameters, MAX_GRID_FANS);
+    const designs = attachCeilingAssessments(
+      enumerateVariabilityDesigns(room, zones, modes, realDiameters, MAX_GRID_FANS),
+      room
+    );
     updateHeader({
       strategy: rawValues.strategy,
       room,
@@ -3799,7 +4601,10 @@ function render() {
     height: rawValues.height
   };
   const modes = getSelectedModes();
-  const candidates = enumerateCandidates(room, MAX_GRID_FANS, modes, realDiameters);
+  const candidates = attachCeilingAssessments(
+    enumerateCandidates(room, MAX_GRID_FANS, modes, realDiameters),
+    room
+  );
   const fallbackFlush = candidates.length === 0 ? getFallbackFlushCandidate(room, MAX_GRID_FANS, realDiameters) : null;
 
   if (candidates.length === 0) {
@@ -3857,6 +4662,7 @@ dom.resetButton.addEventListener("click", () => {
   dom.allowLowInput.checked = true;
   resetState(state);
   renderZonesPanel();
+  renderCeilingPanel();
   render();
 });
 
@@ -3966,13 +4772,53 @@ dom.resultsList.addEventListener("change", (event) => {
   updateExportControls();
 });
 
+dom.ceilingEnabledInput.addEventListener("change", () => {
+  updateCeilingLayout(state, {
+    enabled: dom.ceilingEnabledInput.checked
+  });
+  renderCeilingPanel();
+  render();
+});
+
+[dom.ceilingAnchorXInput, dom.ceilingAnchorYInput].forEach((input) => {
+  input.addEventListener("change", () => {
+    updateCeilingLayout(state, {
+      xAnchorMode: dom.ceilingAnchorXInput.value,
+      yAnchorMode: dom.ceilingAnchorYInput.value
+    });
+    renderCeilingPanel();
+    render();
+  });
+});
+
+dom.ceilingEditorCanvas.addEventListener("click", (event) => {
+  const tileElement =
+    event.target && typeof event.target.closest === "function"
+      ? event.target.closest("[data-luminaire-tile-key]")
+      : null;
+
+  if (!tileElement) {
+    return;
+  }
+
+  toggleCeilingLuminaireTile(state, tileElement.dataset.luminaireTileKey);
+  renderCeilingPanel();
+  render();
+});
+
+dom.clearCeilingLuminairesButton.addEventListener("click", () => {
+  clearCeilingLuminaires(state);
+  renderCeilingPanel();
+  render();
+});
+
 [dom.lengthInput, dom.widthInput].forEach((input) => {
   input.addEventListener("change", () => {
-    if (dom.strategyInput.value !== "variabilite") {
-      return;
+    if (dom.strategyInput.value === "variabilite") {
+      normalizeAllZoneDrafts(state, getCurrentRoomDraft(dom));
+      renderZonesPanel();
     }
-    normalizeAllZoneDrafts(state, getCurrentRoomDraft(dom));
-    renderZonesPanel();
+    renderCeilingPanel();
     render();
   });
 });
@@ -3993,5 +4839,6 @@ bindResultsInteractions(dom);
 initializeCatalogFilters(dom, brasse2Models);
 renderCatalog(dom, brasse2Models);
 toggleStrategyUI();
+renderCeilingPanel();
 render();
 })();

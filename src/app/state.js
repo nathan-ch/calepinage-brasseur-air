@@ -27,11 +27,22 @@ function normalizeZoneDraft(zone, room) {
   };
 }
 
+export function createDefaultCeilingLayout() {
+  return {
+    enabled: false,
+    tileSize: 0.6,
+    xAnchorMode: "symmetric",
+    yAnchorMode: "symmetric",
+    luminaireTiles: new Set()
+  };
+}
+
 export function createAppState() {
   return {
     nextZoneId: 1,
     variabilityZones: [],
-    latestReportState: null
+    latestReportState: null,
+    ceilingLayout: createDefaultCeilingLayout()
   };
 }
 
@@ -88,6 +99,33 @@ export function removeZoneDraft(state, zoneId) {
 
 export function setLatestReportState(state, latestReportState) {
   state.latestReportState = latestReportState;
+}
+
+export function updateCeilingLayout(state, patch) {
+  state.ceilingLayout = {
+    ...state.ceilingLayout,
+    ...patch,
+    luminaireTiles:
+      patch.luminaireTiles instanceof Set
+        ? patch.luminaireTiles
+        : new Set(state.ceilingLayout.luminaireTiles)
+  };
+}
+
+export function toggleCeilingLuminaireTile(state, tileKey) {
+  const nextLuminaireTiles = new Set(state.ceilingLayout.luminaireTiles);
+
+  if (nextLuminaireTiles.has(tileKey)) {
+    nextLuminaireTiles.delete(tileKey);
+  } else {
+    nextLuminaireTiles.add(tileKey);
+  }
+
+  updateCeilingLayout(state, { luminaireTiles: nextLuminaireTiles });
+}
+
+export function clearCeilingLuminaires(state) {
+  updateCeilingLayout(state, { luminaireTiles: new Set() });
 }
 
 export function createSelectedReportOptionKeys(items) {
@@ -155,6 +193,7 @@ export function toggleLatestReportOptionSelection(state, optionKey, selected) {
 export function resetState(state) {
   state.variabilityZones = [];
   state.latestReportState = null;
+  state.ceilingLayout = createDefaultCeilingLayout();
 }
 
 export function getZoneBounds(zone, room) {

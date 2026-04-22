@@ -1,4 +1,4 @@
-import { MAX_GRID_FANS, EPS } from "../core/constants.js";
+import { EPS } from "../core/constants.js";
 import {
   buildModelPicks,
   compareAcoustics,
@@ -11,13 +11,11 @@ import {
 import { normalizeCatalogSearch } from "../core/catalog.js";
 import {
   buildHeightDiameterRequirementMessage,
-  getCandidateWarnings,
-  getVariabilityWarnings
+  getCandidateWarnings
 } from "../core/messages.js";
 import {
   formatDb,
   formatDiameterCm,
-  formatDiameterCmList,
   formatDiameterList,
   formatFactor,
   formatMeters,
@@ -25,8 +23,7 @@ import {
   formatSquareMeters,
   formatTemp
 } from "../core/formatters.js";
-import { zonesOverlap } from "../core/calepinage.js";
-import { planWrapStyle, svgForCandidate, svgForVariabilityDesign } from "./planSvg.js";
+import { planWrapStyle, svgForCandidate } from "./planSvg.js";
 
 const modelSectionRegistry = new Map();
 let nextModelSectionId = 1;
@@ -593,264 +590,6 @@ export function renderResults(dom, candidates, brasse2Models, realDiameters, sel
     .slice(0, 5)
     .map((candidate, index) =>
       candidateCard(candidate, index + 1, brasse2Models, realDiameters, selectedOptionKeySet)
-    )
-    .join("");
-}
-
-function renderVariabilityZoneSummary(zoneSummary) {
-  return `
-    <section class="zone-result-card">
-      <div class="zone-result-head">
-        <div>
-          <h4>${zoneSummary.name}</h4>
-          <p>Cible ${formatMeters(zoneSummary.length)} × ${formatMeters(zoneSummary.width)}</p>
-        </div>
-      </div>
-
-      <div class="metric-grid">
-        <div class="metric-card">
-          <strong>Cellules actives</strong>
-          <span>${zoneSummary.cellsCount}</span>
-        </div>
-        <div class="metric-card">
-          <strong>Surface cible</strong>
-          <span>${formatSquareMeters(zoneSummary.area)}</span>
-        </div>
-        <div class="metric-card">
-          <strong>Surface mobilisee</strong>
-          <span>${formatSquareMeters(zoneSummary.mobilizedArea)}</span>
-        </div>
-        <div class="metric-card">
-          <strong>Trame touchee</strong>
-          <span>${zoneSummary.cellRefs.length > 0 ? zoneSummary.cellRefs.join(", ") : "Aucune"}</span>
-        </div>
-      </div>
-    </section>
-  `;
-}
-
-function variabilityCard(design, rank, brasse2Models, realDiameters, selectedOptionKeys) {
-  const warnings = getVariabilityWarnings(design);
-  const designBrasse2Models = getBrasse2ModelsForCandidate(design, brasse2Models);
-  const isSelectedForExport = selectedOptionKeys.has(design.key);
-
-  return `
-    <article class="result-card">
-      <div class="result-head">
-        <div>
-          <h3 class="result-title">Option ${rank}</h3>
-          <p class="result-subtitle">
-            ${design.fanCount} brasseur${design.fanCount > 1 ? "s" : ""} actif${design.fanCount > 1 ? "s" : ""} sur une trame
-            ${design.nx} × ${design.ny}, avec des cellules de ${formatMeters(design.cellLength)} × ${formatMeters(design.cellWidth)}.
-          </p>
-        </div>
-        ${renderExportOptionToggle(design.key, isSelectedForExport)}
-      </div>
-
-      <div class="result-grid">
-        <div class="plan-wrap" style="${planWrapStyle(design)}">${svgForVariabilityDesign(design)}</div>
-
-        <div class="stack">
-          <div class="metric-grid">
-            <div class="metric-card">
-              <strong>Diametre réel retenu</strong>
-              <span>${formatMeters(design.diameter)}</span>
-            </div>
-            <div class="metric-card">
-              <strong>Cellules actives</strong>
-              <span>${design.fanCount} / ${design.totalCells}</span>
-            </div>
-            <div class="metric-card">
-              <strong>Debordement hors zones</strong>
-              <span>${formatSquareMeters(design.spillArea)}</span>
-            </div>
-            <div class="metric-card">
-              <strong>FCC reel</strong>
-              <span>${formatFactor(design.coverageFactor)}</span>
-            </div>
-          </div>
-
-          <div class="detail-list">
-            <div class="detail-item">
-              <strong>Montage</strong>
-              <span>${design.mountMode.label}</span>
-            </div>
-            <div class="detail-item">
-              <strong>Hauteur sous pales</strong>
-              <span class="detail-value-stack">
-                <span>${formatMeters(design.bladeHeight)}</span>
-                <span class="detail-subtext">Plafond-pales: ${formatMeters(design.mountDistance)}</span>
-              </span>
-            </div>
-            <div class="detail-item">
-              <strong>Diametre theorique max</strong>
-              <span>${formatMeters(design.theoreticalMaxDiameter)}</span>
-            </div>
-            <div class="detail-item">
-              <strong>Mur limitant</strong>
-              <span>${formatMeters(design.wallClearance)} &gt; ${formatMeters(design.diameter)}</span>
-            </div>
-            <div class="detail-item">
-              <strong>Entraxe mini</strong>
-              <span>${design.interFanSpacing ? `${formatMeters(design.interFanSpacing)} &gt; ${formatNumber(2.5, 1)} × D` : "Non applicable (un seul brasseur)"}</span>
-            </div>
-            <div class="detail-item">
-              <strong>Surface cible</strong>
-              <span>${formatSquareMeters(design.targetArea)}</span>
-            </div>
-            <div class="detail-item">
-              <strong>Surface mobilisee</strong>
-              <span>${formatSquareMeters(design.selectedArea)}</span>
-            </div>
-            <div class="detail-item detail-item-stack">
-              <strong>Diametres BRASSE II admissibles (FCC &gt;= 0,2)</strong>
-              <span>${formatDiameterCmList(design.compatibleRealDiameters)}</span>
-            </div>
-            ${renderCeilingDetailItems(design)}
-          </div>
-        </div>
-      </div>
-
-      ${warnings.length > 0 ? `
-        <div class="notice warning">
-          <strong>Point d'attention.</strong>
-          ${warnings.join(" ")}
-        </div>
-      ` : ""}
-
-      ${renderCeilingNotice(design)}
-
-      <div class="zone-results">
-        ${design.zoneSummaries.map((zoneSummary) => renderVariabilityZoneSummary(zoneSummary)).join("")}
-      </div>
-
-      ${designBrasse2Models.length > 0 ? renderBrasse2Section(design, brasse2Models, realDiameters) : `
-        <section class="models-shell">
-          <div class="notice warning">
-            <strong>Aucun modele BRASSE II compatible.</strong>
-            Aucun modele de la base n'est disponible sur les diametres ${formatDiameterCmList(design.compatibleRealDiameters)}.
-          </div>
-        </section>
-      `}
-    </article>
-  `;
-}
-
-export function renderVariabilitySummary(dom, room, zones, designs, brasse2Models) {
-  const displayedDesigns = designs.slice(0, 5);
-  const targetArea = zones.reduce((sum, zone) => sum + zone.length * zone.width, 0);
-  const compatibleModels = getDistinctCompatibleModels(displayedDesigns, brasse2Models);
-  const diameterSummary = getMaxDiameterSummary(displayedDesigns);
-  const mountSummary = getNeutralMountSummary(displayedDesigns);
-
-  dom.summaryGrid.innerHTML = [
-    createSummaryCard(
-      "Piece",
-      `${formatMeters(room.length)} × ${formatMeters(room.width)}`,
-      `${formatSquareMeters(room.length * room.width)} - HSP ${formatMeters(room.height)}`
-    ),
-    createSummaryCard(
-      "Zones cibles",
-      `${zones.length}`,
-      `${formatSquareMeters(targetArea)} a couvrir`
-    ),
-    createSummaryCard(
-      "Options valides",
-      `${designs.length}`,
-      `Montages visibles : ${mountSummary}`
-    ),
-    createSummaryCard(
-      "Diametre max",
-      diameterSummary.value,
-      diameterSummary.detail
-    ),
-    createSummaryCard(
-      "Base BRASSE II",
-      compatibleModels.length > 0
-        ? `${compatibleModels.length} modeles`
-        : "Aucun modele compatible",
-      "Compatibles avec les options affichees"
-    )
-  ].join("");
-  dom.highlights.innerHTML = "";
-}
-
-export function renderVariabilityStatusNote(
-  dom,
-  room,
-  zones,
-  designs,
-  modes,
-  realDiameters
-) {
-  const notes = [];
-  const heightRequirementMessage = buildHeightDiameterRequirementMessage(room, modes, realDiameters);
-
-  const overlapPairs = [];
-  for (let index = 0; index < zones.length; index += 1) {
-    for (let otherIndex = index + 1; otherIndex < zones.length; otherIndex += 1) {
-      if (zonesOverlap(zones[index], zones[otherIndex])) {
-        overlapPairs.push(`${zones[index].name} / ${zones[otherIndex].name}`);
-      }
-    }
-  }
-
-  if (overlapPairs.length > 0) {
-    notes.push(`
-      <div class="notice warning">
-        <strong>Zones cibles en recouvrement.</strong>
-        ${overlapPairs.join(", ")}. Le moteur peut tout de meme proposer des cellules actives, mais les besoins ne
-        sont plus totalement distincts.
-      </div>
-    `);
-  }
-
-  if (designs.length === 0) {
-    notes.push(`
-      <div class="notice danger">
-        <strong>Aucune trame valide n'a ete trouvee.</strong>
-        L'outil a teste des maillages reguliers jusqu'a ${MAX_GRID_FANS} cellules, avec les regles BRASSE de FCC,
-        de distances et de hauteur.
-        ${heightRequirementMessage}
-      </div>
-    `);
-  } else {
-    const bestDesign = designs[0];
-    notes.push(`
-      <div class="notice">
-        <strong>Couverture de l'option de tete.</strong>
-        La trame retenue mobilise <code>${bestDesign.fanCount}</code> cellule${bestDesign.fanCount > 1 ? "s" : ""}
-        pour couvrir <code>${formatSquareMeters(bestDesign.targetArea)}</code> de zones cibles, avec un debordement
-        de <code>${formatSquareMeters(bestDesign.spillArea)}</code> hors rectangles.
-      </div>
-    `);
-
-    if (bestDesign.mountMode.id === "low-profile") {
-      notes.push(`
-        <div class="notice warning">
-          <strong>La meilleure variante passe en low-profile.</strong>
-          Le guide annonce alors une baisse de vitesse d'air d'environ 15 % par rapport au montage standard.
-        </div>
-      `);
-    }
-  }
-
-  dom.statusNote.innerHTML = notes.join("");
-}
-
-export function renderVariabilityResults(
-  dom,
-  designs,
-  brasse2Models,
-  realDiameters,
-  selectedOptionKeys = []
-) {
-  resetResultsModelSections();
-  const selectedOptionKeySet = new Set(selectedOptionKeys);
-  dom.resultsList.innerHTML = designs
-    .slice(0, 5)
-    .map((design, index) =>
-      variabilityCard(design, index + 1, brasse2Models, realDiameters, selectedOptionKeySet)
     )
     .join("");
 }

@@ -1,7 +1,6 @@
 export function getDomRefs() {
   return {
     form: document.getElementById("calculator-form"),
-    strategyInput: document.getElementById("strategy"),
     simulationNameInput: document.getElementById("simulation-name"),
     lengthInput: document.getElementById("length"),
     widthInput: document.getElementById("width"),
@@ -13,9 +12,6 @@ export function getDomRefs() {
     ceilingEditorSummary: document.getElementById("ceiling-editor-summary"),
     ceilingEditorCanvas: document.getElementById("ceiling-editor-canvas"),
     clearCeilingLuminairesButton: document.getElementById("clear-ceiling-luminaires"),
-    zonesConfig: document.getElementById("zones-config"),
-    zonesList: document.getElementById("zones-list"),
-    addZoneButton: document.getElementById("add-zone-button"),
     allowStandardInput: document.getElementById("allow-standard"),
     allowLowInput: document.getElementById("allow-low"),
     resetButton: document.getElementById("reset-button"),

@@ -4,25 +4,17 @@ import {
   createAppState,
   createSelectedReportOptionKeys,
   clearCeilingLuminaires,
-  createDefaultZoneDraft,
-  ensureVariabilityZones,
-  getCurrentRoomDraft,
   getSelectedReportOptions,
-  normalizeAllZoneDrafts,
-  removeZoneDraft,
   resetState,
   setLatestReportState,
   toggleLatestReportOptionSelection,
   toggleCeilingLuminaireTile,
-  updateCeilingLayout,
-  updateZoneDraft
+  updateCeilingLayout
 } from "./app/state.js";
 import { MAX_GRID_FANS, MOUNT_MODES } from "./core/constants.js";
 import {
   enumerateCandidates,
-  enumerateVariabilityDesigns,
-  getFallbackFlushCandidate,
-  parseZoneDrafts
+  getFallbackFlushCandidate
 } from "./core/calepinage.js";
 import { assessOptionCeilingCompatibility } from "./core/ceilingAssessment.js";
 import { buildCeilingGrid } from "./core/ceilingGrid.js";
@@ -39,10 +31,7 @@ import {
   renderResults,
   resetResultsModelSections,
   renderStatusNote,
-  renderSummary,
-  renderVariabilityResults,
-  renderVariabilityStatusNote,
-  renderVariabilitySummary
+  renderSummary
 } from "./ui/results.js";
 import {
   refreshReportHeader,
@@ -50,7 +39,6 @@ import {
   setExportSelectionSummary
 } from "./ui/reportHeader.js";
 import { renderCeilingEditor } from "./ui/ceilingEditor.js";
-import { renderZonesEditor, syncZoneCard } from "./ui/zonesEditor.js";
 import { exportPdfReport } from "./report/pdf.js";
 
 const dom = getDomRefs();
@@ -67,10 +55,6 @@ const realDiameters = [
 function getSimulationName() {
   const value = String(dom.simulationNameInput.value || "").trim();
   return value || "Simulation sans nom";
-}
-
-function getStrategyLabel(strategy) {
-  return strategy === "variabilite" ? "Zones a couvrir" : "Recherche d'uniformite";
 }
 
 function getSelectedModes() {
@@ -99,7 +83,7 @@ function getRoomInputs() {
 
 function renderCeilingPanel() {
   dom.ceilingEnabledInput.checked = state.ceilingLayout.enabled;
-  return renderCeilingEditor(dom, state, getCurrentRoomDraft(dom));
+  return renderCeilingEditor(dom, state, getRoomInputs());
 }
 
 function getActiveCeilingGrid(room) {
@@ -124,25 +108,9 @@ function attachCeilingAssessments(items, room) {
   }));
 }
 
-function toggleStrategyUI() {
-  const isVariability = dom.strategyInput.value === "variabilite";
-  dom.zonesConfig.classList.toggle("hidden", !isVariability);
-  if (isVariability) {
-    renderZonesPanel();
-  }
-}
-
-function renderZonesPanel() {
-  const roomDraft = getCurrentRoomDraft(dom);
-  ensureVariabilityZones(state, roomDraft);
-  normalizeAllZoneDrafts(state, roomDraft);
-  renderZonesEditor(dom, state, roomDraft);
-}
-
-function updateHeader({ strategy, room, recommendation = "", generatedAt = new Date() }) {
+function updateHeader({ room, recommendation = "", generatedAt = new Date() }) {
   refreshReportHeader(dom, {
     simulationName: getSimulationName(),
-    strategyLabel: getStrategyLabel(strategy),
     modesLabel: getSelectedModesLabel(),
     recommendation,
     generatedAt,
@@ -177,22 +145,16 @@ function updateExportControls() {
 
   const selectedOptions = getSelectedReportOptions(latestReportState);
   if (selectedOptions.length === 0) {
-    setExportAvailability(dom, latestReportState.kind !== "uniformity-ok" && latestReportState.kind !== "variability-ok");
+    setExportAvailability(dom, latestReportState.kind !== "uniformity-ok");
     setExportSelectionSummary(
       dom,
-      latestReportState.kind === "uniformity-ok" || latestReportState.kind === "variability-ok"
-        ? "Aucune option selectionnee pour le PDF"
-        : ""
+      latestReportState.kind === "uniformity-ok" ? "Aucune option selectionnee pour le PDF" : ""
     );
     return;
   }
 
   const selectableCount =
-    latestReportState.kind === "uniformity-ok"
-      ? latestReportState.candidates.length
-      : latestReportState.kind === "variability-ok"
-        ? latestReportState.designs.length
-        : 0;
+    latestReportState.kind === "uniformity-ok" ? latestReportState.candidates.length : 0;
 
   setExportAvailability(dom, true);
   setExportSelectionSummary(
@@ -214,14 +176,12 @@ function resetResultsVisibility() {
 
 function renderInvalidState(rawValues, issues, generatedAt) {
   updateHeader({
-    strategy: rawValues.strategy,
     room: rawValues,
     recommendation: "Calcul impossible",
     generatedAt
   });
   setLatestReportState(state, {
     kind: "invalid",
-    strategy: rawValues.strategy,
     simulationName: getSimulationName(),
     room: rawValues,
     modesLabel: getSelectedModesLabel(),
@@ -241,44 +201,8 @@ function renderInvalidState(rawValues, issues, generatedAt) {
   dom.resultsContent.classList.remove("hidden");
 }
 
-function renderVariabilityInvalidZones(room, zones, zoneIssues, generatedAt) {
-  updateHeader({
-    strategy: dom.strategyInput.value,
-    room,
-    recommendation: "Zones invalides",
-    generatedAt
-  });
-  setLatestReportState(state, {
-    kind: "variability-empty",
-    strategy: dom.strategyInput.value,
-    simulationName: getSimulationName(),
-    room,
-    zones,
-    modesLabel: getSelectedModesLabel(),
-    generatedAt,
-    context: "Zones invalides",
-    issues: zoneIssues
-  });
-  dom.summaryGrid.innerHTML = [
-    createSummaryCard("Strategie", "Zones a couvrir", "Corrigez les rectangles cibles"),
-    createSummaryCard("Local", `${formatMeters(room.length)} × ${formatMeters(room.width)}`, `HSP ${formatMeters(room.height)}`),
-    createSummaryCard("Zones", `${zones.length}`, "Chaque rectangle doit rester dans le local"),
-    createSummaryCard("Resultat", "Calcul bloque", "Impossible d'evaluer les zones a couvrir")
-  ].join("");
-  dom.highlights.innerHTML = "";
-  dom.statusNote.innerHTML = `
-    <div class="notice danger">
-      <strong>Zones invalides.</strong>
-      ${zoneIssues.join(" ")}
-    </div>
-  `;
-  dom.resultsList.innerHTML = "";
-  dom.resultsContent.classList.remove("hidden");
-}
-
 function renderUniformityEmpty(room, fallbackFlush, generatedAt) {
   updateHeader({
-    strategy: dom.strategyInput.value,
     room,
     recommendation: "Aucune solution compatible",
     generatedAt
@@ -287,7 +211,6 @@ function renderUniformityEmpty(room, fallbackFlush, generatedAt) {
   const heightRequirementMessage = buildHeightDiameterRequirementMessage(room, modes, realDiameters);
   setLatestReportState(state, {
     kind: "uniformity-empty",
-    strategy: dom.strategyInput.value,
     simulationName: getSimulationName(),
     room,
     modesLabel: getSelectedModesLabel(modes),
@@ -312,13 +235,9 @@ function renderUniformityEmpty(room, fallbackFlush, generatedAt) {
 }
 
 function render() {
-  toggleStrategyUI();
   renderCeilingPanel();
 
-  const rawValues = {
-    strategy: dom.strategyInput.value,
-    ...getRoomInputs()
-  };
+  const rawValues = getRoomInputs();
   const issues = validateInputs(rawValues);
   const generatedAt = new Date();
 
@@ -326,77 +245,6 @@ function render() {
 
   if (issues.length > 0) {
     renderInvalidState(rawValues, issues, generatedAt);
-    return;
-  }
-
-  if (rawValues.strategy === "variabilite") {
-    const room = {
-      length: rawValues.length,
-      width: rawValues.width,
-      height: rawValues.height
-    };
-    const { zones, issues: zoneIssues } = parseZoneDrafts(room, state.variabilityZones);
-
-    if (zoneIssues.length > 0) {
-      renderVariabilityInvalidZones(room, zones, zoneIssues, generatedAt);
-      return;
-    }
-
-    const modes = getSelectedModes();
-    const designs = attachCeilingAssessments(
-      enumerateVariabilityDesigns(room, zones, modes, realDiameters, MAX_GRID_FANS),
-      room
-    );
-    updateHeader({
-      strategy: rawValues.strategy,
-      room,
-      recommendation: designs[0]
-        ? `Option recommandee : ${designs[0].fanCount} brasseur${designs[0].fanCount > 1 ? "s" : ""} sur ${designs[0].nx} × ${designs[0].ny}`
-        : "Aucune trame valide",
-      generatedAt
-    });
-    const heightRequirementMessage = buildHeightDiameterRequirementMessage(room, modes, realDiameters);
-    setLatestReportState(
-      state,
-      designs.length > 0
-        ? {
-            kind: "variability-ok",
-            strategy: rawValues.strategy,
-            simulationName: getSimulationName(),
-            room,
-            zones,
-            designs: designs.slice(0, 5),
-            selectedOptionKeys: createSelectedReportOptionKeys(designs.slice(0, 5)),
-            modesLabel: getSelectedModesLabel(modes),
-            generatedAt,
-            context: `Zones a couvrir • option recommandee : ${designs[0].fanCount} brasseur${designs[0].fanCount > 1 ? "s" : ""} sur ${designs[0].nx} × ${designs[0].ny}`
-          }
-        : {
-            kind: "variability-empty",
-            strategy: rawValues.strategy,
-            simulationName: getSimulationName(),
-            room,
-            zones,
-            modesLabel: getSelectedModesLabel(modes),
-            generatedAt,
-            context: "Aucune trame valide",
-            issues: [
-              "Aucune trame reguliere n'a respecte les regles BRASSE avec les rectangles saisis.",
-              ...(heightRequirementMessage ? [heightRequirementMessage] : [])
-            ]
-          }
-    );
-    renderVariabilitySummary(dom, room, zones, designs, brasse2Models);
-    renderVariabilityStatusNote(dom, room, zones, designs, modes, realDiameters);
-    renderVariabilityResults(
-      dom,
-      designs,
-      brasse2Models,
-      realDiameters,
-      state.latestReportState?.selectedOptionKeys || []
-    );
-    updateExportControls();
-    dom.resultsContent.classList.remove("hidden");
     return;
   }
 
@@ -410,7 +258,8 @@ function render() {
     enumerateCandidates(room, MAX_GRID_FANS, modes, realDiameters),
     room
   );
-  const fallbackFlush = candidates.length === 0 ? getFallbackFlushCandidate(room, MAX_GRID_FANS, realDiameters) : null;
+  const fallbackFlush =
+    candidates.length === 0 ? getFallbackFlushCandidate(room, MAX_GRID_FANS, realDiameters) : null;
 
   if (candidates.length === 0) {
     renderUniformityEmpty(room, fallbackFlush, generatedAt);
@@ -418,14 +267,12 @@ function render() {
   }
 
   updateHeader({
-    strategy: rawValues.strategy,
     room,
     recommendation: `Option recommandee : ${candidates[0].nx} × ${candidates[0].ny} - ${candidates[0].fanCount} brasseur${candidates[0].fanCount > 1 ? "s" : ""}`,
     generatedAt
   });
   setLatestReportState(state, {
     kind: "uniformity-ok",
-    strategy: rawValues.strategy,
     simulationName: getSimulationName(),
     room,
     candidates: candidates.slice(0, 5),
@@ -452,36 +299,19 @@ dom.form.addEventListener("submit", (event) => {
   render();
 });
 
-dom.strategyInput.addEventListener("change", () => {
-  toggleStrategyUI();
-  render();
-});
-
 dom.resetButton.addEventListener("click", () => {
   dom.lengthInput.value = "9";
   dom.widthInput.value = "5";
   dom.heightInput.value = "2.5";
   dom.simulationNameInput.value = "";
-  dom.strategyInput.value = "uniformite";
   dom.allowStandardInput.checked = true;
   dom.allowLowInput.checked = true;
   resetState(state);
-  renderZonesPanel();
-  renderCeilingPanel();
   render();
-});
-
-dom.addZoneButton.addEventListener("click", () => {
-  state.variabilityZones.push(createDefaultZoneDraft(state, getCurrentRoomDraft(dom)));
-  renderZonesPanel();
-  if (dom.strategyInput.value === "variabilite") {
-    render();
-  }
 });
 
 dom.simulationNameInput.addEventListener("input", () => {
   updateHeader({
-    strategy: dom.strategyInput.value,
     room: getRoomInputs()
   });
 });
@@ -511,62 +341,6 @@ dom.catalogResetButton.addEventListener("click", () => {
   renderCatalog(dom, brasse2Models);
 });
 
-dom.zonesList.addEventListener("input", (event) => {
-  const target = event.target;
-  if (!target?.dataset || target.type !== "range") {
-    return;
-  }
-  const zoneId = Number(target.dataset.zoneId);
-  const field = target.dataset.field;
-  if (!Number.isFinite(zoneId) || !field) {
-    return;
-  }
-
-  const roomDraft = getCurrentRoomDraft(dom);
-  updateZoneDraft(state, roomDraft, zoneId, field, target.value);
-  const zone = state.variabilityZones.find((item) => item.id === zoneId);
-  syncZoneCard(dom, zone, roomDraft);
-});
-
-dom.zonesList.addEventListener("change", (event) => {
-  const target = event.target;
-  if (!target?.dataset) {
-    return;
-  }
-  const zoneId = Number(target.dataset.zoneId);
-  const field = target.dataset.field;
-  if (!Number.isFinite(zoneId) || !field) {
-    return;
-  }
-
-  const roomDraft = getCurrentRoomDraft(dom);
-  updateZoneDraft(state, roomDraft, zoneId, field, target.value);
-  const zone = state.variabilityZones.find((item) => item.id === zoneId);
-  syncZoneCard(dom, zone, roomDraft);
-  if (dom.strategyInput.value === "variabilite") {
-    render();
-  }
-});
-
-dom.zonesList.addEventListener("click", (event) => {
-  const removeButton =
-    event.target && typeof event.target.closest === "function"
-      ? event.target.closest("[data-remove-zone]")
-      : null;
-  if (!removeButton) {
-    return;
-  }
-  const zoneId = Number(removeButton.dataset.removeZone);
-  if (!Number.isFinite(zoneId)) {
-    return;
-  }
-  removeZoneDraft(state, zoneId);
-  renderZonesPanel();
-  if (dom.strategyInput.value === "variabilite") {
-    render();
-  }
-});
-
 dom.resultsList.addEventListener("change", (event) => {
   const target = event.target;
   if (!target?.matches?.("[data-export-option-key]")) {
@@ -581,7 +355,6 @@ dom.ceilingEnabledInput.addEventListener("change", () => {
   updateCeilingLayout(state, {
     enabled: dom.ceilingEnabledInput.checked
   });
-  renderCeilingPanel();
   render();
 });
 
@@ -591,7 +364,6 @@ dom.ceilingEnabledInput.addEventListener("change", () => {
       xAnchorMode: dom.ceilingAnchorXInput.value,
       yAnchorMode: dom.ceilingAnchorYInput.value
     });
-    renderCeilingPanel();
     render();
   });
 });
@@ -607,35 +379,23 @@ dom.ceilingEditorCanvas.addEventListener("click", (event) => {
   }
 
   toggleCeilingLuminaireTile(state, tileElement.dataset.luminaireTileKey);
-  renderCeilingPanel();
   render();
 });
 
 dom.clearCeilingLuminairesButton.addEventListener("click", () => {
   clearCeilingLuminaires(state);
-  renderCeilingPanel();
   render();
 });
 
-[dom.lengthInput, dom.widthInput].forEach((input) => {
-  input.addEventListener("change", () => {
-    if (dom.strategyInput.value === "variabilite") {
-      normalizeAllZoneDrafts(state, getCurrentRoomDraft(dom));
-      renderZonesPanel();
-    }
-    renderCeilingPanel();
-    render();
-  });
-});
-
-[dom.heightInput, dom.allowStandardInput, dom.allowLowInput].forEach((input) => {
-  input.addEventListener("change", () => {
-    render();
-  });
-});
+[dom.lengthInput, dom.widthInput, dom.heightInput, dom.allowStandardInput, dom.allowLowInput].forEach(
+  (input) => {
+    input.addEventListener("change", () => {
+      render();
+    });
+  }
+);
 
 updateHeader({
-  strategy: dom.strategyInput.value,
   room: getRoomInputs()
 });
 setExportAvailability(dom, false);
@@ -643,6 +403,4 @@ setExportSelectionSummary(dom, "");
 bindResultsInteractions(dom);
 initializeCatalogFilters(dom, brasse2Models);
 renderCatalog(dom, brasse2Models);
-toggleStrategyUI();
-renderCeilingPanel();
 render();

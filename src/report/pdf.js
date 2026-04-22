@@ -4,8 +4,7 @@ import {
   getReportModelHighlights
 } from "../core/brasse2.js";
 import {
-  getCandidateWarnings,
-  getVariabilityWarnings
+  getCandidateWarnings
 } from "../core/messages.js";
 import {
   escapeHtml,
@@ -20,8 +19,7 @@ import {
   formatTemp
 } from "../core/formatters.js";
 import {
-  svgForCandidate,
-  svgForVariabilityDesign
+  svgForCandidate
 } from "../ui/planSvg.js";
 
 function getAllReportOptions(state) {
@@ -31,10 +29,6 @@ function getAllReportOptions(state) {
 
   if (state.kind === "uniformity-ok") {
     return state.candidates || [];
-  }
-
-  if (state.kind === "variability-ok") {
-    return state.designs || [];
   }
 
   return [];
@@ -204,15 +198,6 @@ function renderStudySummarySection(state, selectedOptions, brasse2Models) {
     ]
   ];
 
-  if (state.kind === "variability-ok") {
-    const targetArea = state.zones.reduce((sum, zone) => sum + zone.area, 0);
-    baseCards.splice(1, 0, [
-      "Zones cibles",
-      `${state.zones.length}`,
-      `${formatSquareMeters(targetArea)} a couvrir`
-    ]);
-  }
-
   return `
     <section class="report-block">
       <h2>Synthese de la piece etudiee</h2>
@@ -254,50 +239,6 @@ function renderSelectedOptionsOverview(state, selectedOptions) {
       </section>
     `;
   }
-
-  const rows = selectedOptions.map((option) => [
-    `Option ${getReportOptionNumber(state, option)}`,
-    `${option.nx} × ${option.ny}`,
-    `${option.fanCount} / ${option.totalCells}`,
-    formatMeters(option.diameter),
-    option.mountMode.label,
-    formatSquareMeters(option.spillArea)
-  ]);
-
-  return `
-    <section class="report-block">
-      <h2>Synthese de ou des option(s) retenue(s) :</h2>
-      ${renderReportTable(
-        ["Option", "Trame", "Cellules actives", "Diametre reel", "Montage", "Debordement"],
-        rows,
-        true
-      )}
-    </section>
-  `;
-}
-
-function renderZonesSummaryTable(zones) {
-  if (!zones || zones.length === 0) {
-    return "";
-  }
-
-  const rows = zones.map((zone) => [
-    zone.name,
-    `${formatMeters(zone.length)} × ${formatMeters(zone.width)}`,
-    formatSquareMeters(zone.area),
-    `${formatMeters(zone.centerX)} ; ${formatMeters(zone.centerY)}`
-  ]);
-
-  return `
-    <section class="report-block">
-      <h2>Zones cibles</h2>
-      ${renderReportTable(
-        ["Zone", "Dimensions", "Surface", "Centre"],
-        rows,
-        true
-      )}
-    </section>
-  `;
 }
 
 function renderUniformityOptionPage(state, option, brasse2Models) {
@@ -348,77 +289,6 @@ function renderUniformityOptionPage(state, option, brasse2Models) {
   `;
 }
 
-function renderVariabilityZoneSummary(option) {
-  const rows = option.zoneSummaries.map((zoneSummary) => [
-    zoneSummary.name,
-    `${formatMeters(zoneSummary.length)} × ${formatMeters(zoneSummary.width)}`,
-    String(zoneSummary.cellsCount),
-    formatSquareMeters(zoneSummary.area),
-    formatSquareMeters(zoneSummary.mobilizedArea)
-  ]);
-
-  return `
-    <section class="report-section">
-      <h3>Zones couvertes</h3>
-      ${renderReportTable(
-        ["Zone", "Dimensions", "Cellules actives", "Surface cible", "Surface mobilisee"],
-        rows,
-        true
-      )}
-    </section>
-  `;
-}
-
-function renderVariabilityOptionPage(state, option, brasse2Models) {
-  const optionNumber = getReportOptionNumber(state, option);
-
-  return `
-    <section class="report-page report-option-page">
-      <div class="report-section-head">
-        <p class="report-section-kicker">Option ${optionNumber}</p>
-        <h2>${escapeHtml(`${option.nx} × ${option.ny} cellules`)}</h2>
-        <p>${escapeHtml(`${option.fanCount} cellule${option.fanCount > 1 ? "s" : ""} active${option.fanCount > 1 ? "s" : ""} • ${option.mountMode.label}`)}</p>
-      </div>
-
-      ${renderReportMetricGrid([
-        ["Diametre reel retenu", formatMeters(option.diameter)],
-        ["Cellules actives", `${option.fanCount} / ${option.totalCells}`],
-        ["FCC reel", formatFactor(option.coverageFactor)],
-        ["Hauteur sous pales", formatMeters(option.bladeHeight)],
-        ["Surface cible", formatSquareMeters(option.targetArea)],
-        ["Debordement", formatSquareMeters(option.spillArea)]
-      ])}
-
-      <div class="report-plan-block">
-        <div class="report-plan">${svgForVariabilityDesign(option)}</div>
-        <div class="report-side">
-          ${renderReportTable(
-            ["Lecture", "Valeur"],
-            [
-              ["Montage", option.mountMode.label],
-              ["Cellule", `${formatMeters(option.cellLength)} × ${formatMeters(option.cellWidth)}`],
-              ["Diametre theorique max", formatMeters(option.theoreticalMaxDiameter)],
-              ["Mur limitant", `${formatMeters(option.wallClearance)} > ${formatMeters(option.diameter)}`],
-              [
-                "Entraxe mini",
-                option.interFanSpacing
-                  ? `${formatMeters(option.interFanSpacing)} > 2,5 × D`
-                  : "Non applicable"
-              ],
-              ["Diametres admissibles", formatDiameterCmList(option.compatibleRealDiameters)]
-            ],
-            true
-          )}
-          ${renderReportWarningList(getVariabilityWarnings(option))}
-        </div>
-      </div>
-
-      ${renderVariabilityZoneSummary(option)}
-      ${renderModelHighlights(option, brasse2Models)}
-    </section>
-  `;
-}
-
 function renderReportFirstPage(state, selectedOptions, brasse2Models) {
   return `
     <section class="report-page report-first-page">
@@ -433,7 +303,6 @@ function renderReportFirstPage(state, selectedOptions, brasse2Models) {
       </header>
 
       ${renderStudySummarySection(state, selectedOptions, brasse2Models)}
-      ${state.kind === "variability-ok" ? renderZonesSummaryTable(state.zones) : ""}
       ${renderSelectedOptionsOverview(state, selectedOptions)}
     </section>
   `;
@@ -461,10 +330,6 @@ function renderEmptyOrInvalidReport(state) {
     title = "Aucune solution compatible";
     text =
       "Aucun cas standard ou low-profile n'a pu etre valide avec les regles BRASSE de FCC, de distances et de hauteur.";
-  } else if (state.kind === "variability-empty") {
-    title = "Aucune trame valide";
-    text =
-      "Le moteur n'a pas trouve de trame reguliere conforme aux regles BRASSE pour couvrir les zones cibles saisies.";
   }
 
   return `
@@ -726,13 +591,6 @@ export function buildPdfReportDocument(state, brasse2Models) {
       ${renderReportFirstPage(state, selectedOptions, brasse2Models)}
       ${selectedOptions
         .map((option) => renderUniformityOptionPage(state, option, brasse2Models))
-        .join("")}
-    `;
-  } else if (state.kind === "variability-ok") {
-    bodyContent = `
-      ${renderReportFirstPage(state, selectedOptions, brasse2Models)}
-      ${selectedOptions
-        .map((option) => renderVariabilityOptionPage(state, option, brasse2Models))
         .join("")}
     `;
   } else {

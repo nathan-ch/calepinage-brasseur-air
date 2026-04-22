@@ -177,12 +177,6 @@ label {
   color: var(--ink);
 }
 
-.label-with-help {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
 .stack {
   display: grid;
   gap: 10px;
@@ -339,7 +333,6 @@ label {
   }
 
   .field-grid,
-  .zone-grid,
   .metric-grid,
   .models-grid {
     grid-template-columns: 1fr;
@@ -384,7 +377,6 @@ label {
   .result-card,
   .notice,
   .model-card,
-  .zone-result-card,
   .report-head,
   .report-meta-card {
     box-shadow: none;
@@ -406,7 +398,6 @@ label {
   .summary-card,
   .notice,
   .model-card,
-  .zone-result-card,
   .report-head,
   .report-meta-card,
   .models-shell {

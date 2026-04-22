@@ -1750,13 +1750,12 @@ function svgForVariabilityDesign(design) {
 // src/ui/reportHeader.js
 function refreshReportHeader(
   dom,
-  { simulationName, strategyLabel, modesLabel, recommendation = "", generatedAt = new Date() }
+  { simulationName, generatedAt = new Date() }
 ) {
   dom.reportKicker.textContent = `Rapport de simulation • le ${formatDateTime(generatedAt)}`;
   dom.reportTitle.textContent = simulationName;
-  dom.reportContext.textContent = [strategyLabel, recommendation, modesLabel]
-    .filter(Boolean)
-    .join(" • ");
+  dom.reportContext.textContent = "";
+  dom.reportContext.classList.add("hidden");
 
   const metaItems = [];
   dom.reportMeta.innerHTML = metaItems
@@ -1860,6 +1859,119 @@ function renderZonesEditor(dom, state, room) {
 }
 
 // src/ui/results.js
+const modelSectionRegistry = new Map();
+let nextModelSectionId = 1;
+
+function registerModelSection(models) {
+  const sectionId = `compatible-models-${nextModelSectionId}`;
+  nextModelSectionId += 1;
+  modelSectionRegistry.set(sectionId, models);
+  return sectionId;
+}
+
+function getDefaultCompatibleModelsComparator(a, b) {
+  if (a.isSelectedDiameter !== b.isSelectedDiameter) {
+    return a.isSelectedDiameter ? -1 : 1;
+  }
+  if (Math.abs(b.compatibleOption.diameter - a.compatibleOption.diameter) > EPS) {
+    return b.compatibleOption.diameter - a.compatibleOption.diameter;
+  }
+  return compareComfort(a, b);
+}
+
+function sortCompatibleModels(models, sortKey = "default") {
+  const comparator =
+    {
+      default: getDefaultCompatibleModelsComparator,
+      "diameter-desc": (a, b) =>
+        b.diameterCm - a.diameterCm || getDefaultCompatibleModelsComparator(a, b),
+      "diameter-asc": (a, b) =>
+        a.diameterCm - b.diameterCm || getDefaultCompatibleModelsComparator(a, b),
+      "fcc-desc": (a, b) => compareCoverage(a, b) || getDefaultCompatibleModelsComparator(a, b),
+      comfort: (a, b) => compareComfort(a, b) || getDefaultCompatibleModelsComparator(a, b),
+      efficiency: (a, b) =>
+        compareEfficiency(a, b) || getDefaultCompatibleModelsComparator(a, b),
+      acoustics: (a, b) =>
+        compareAcoustics(a, b) || getDefaultCompatibleModelsComparator(a, b)
+    }[sortKey] || getDefaultCompatibleModelsComparator;
+
+  return [...models].sort(comparator);
+}
+
+function filterCompatibleModels(models, { search }) {
+  const normalizedSearch = normalizeCatalogSearch(search);
+
+  return models.filter((model) => {
+    if (!normalizedSearch) {
+      return true;
+    }
+
+    const haystack = normalizeCatalogSearch(
+      [
+        model.id,
+        model.brand,
+        model.model,
+        model.motor,
+        model.fixation,
+        String(model.diameterCm)
+      ].join(" ")
+    );
+
+    return haystack.includes(normalizedSearch);
+  });
+}
+
+function renderModelsTableSummary(filteredCount, totalCount) {
+  if (filteredCount === totalCount) {
+    return `${totalCount} modele${totalCount > 1 ? "s" : ""}`;
+  }
+
+  return `${filteredCount} / ${totalCount} modele${totalCount > 1 ? "s" : ""}`;
+}
+
+function getNeutralMountSummary(items) {
+  const labels = [
+    ...new Set(
+      items
+        .map((item) => item.mountMode?.id)
+        .filter(Boolean)
+        .map((mountId) => (mountId === "low-profile" ? "low-profile" : "standard"))
+    )
+  ];
+
+  return labels.length > 0 ? labels.join(" + ") : "Aucun";
+}
+
+function getMaxDiameterSummary(items) {
+  const diameters = items.map((item) => item.diameter).filter(Number.isFinite);
+
+  if (diameters.length === 0) {
+    return {
+      value: "Aucun",
+      detail: "Aucun diametre reel compatible"
+    };
+  }
+
+  const maxDiameter = Math.max(...diameters);
+
+  return {
+    value: `${formatDiameterCm(maxDiameter)} cm`,
+    detail: "Plus grand diametre reel compatible sur les options affichees"
+  };
+}
+
+function getDistinctCompatibleModels(items, brasse2Models) {
+  const modelsById = new Map();
+
+  items.forEach((item) => {
+    getBrasse2ModelsForCandidate(item, brasse2Models).forEach((model) => {
+      modelsById.set(model.id, model);
+    });
+  });
+
+  return [...modelsById.values()];
+}
+
 function createSummaryCard(label, value, detail) {
   return `
     <article class="summary-card">
@@ -1893,6 +2005,15 @@ function renderModelCard(title, model) {
 }
 
 function renderModelsTable(models) {
+  if (models.length === 0) {
+    return `
+      <div class="notice warning">
+        <strong>Aucun modele ne correspond aux filtres actifs.</strong>
+        Elargissez la recherche ou reinitialisez les filtres de cette option.
+      </div>
+    `;
+  }
+
   return `
     <div class="table-wrap">
       <table>
@@ -1939,6 +2060,93 @@ function renderModelsTable(models) {
   `;
 }
 
+function renderModelsToolbar(sectionId, models) {
+  return `
+    <div class="models-toolbar">
+      <div class="field">
+        <label for="${sectionId}-search">Recherche</label>
+        <input id="${sectionId}-search" type="search" placeholder="Ref., marque, modele" data-model-search>
+      </div>
+      <div class="field">
+        <label for="${sectionId}-sort">Tri</label>
+        <select id="${sectionId}-sort" data-model-sort>
+          <option value="default">Ordre recommande</option>
+          <option value="fcc-desc">FCC reel decroissant</option>
+          <option value="comfort">Confort</option>
+          <option value="efficiency">Efficacite</option>
+          <option value="acoustics">Acoustique</option>
+          <option value="diameter-desc">Diametre decroissant</option>
+          <option value="diameter-asc">Diametre croissant</option>
+        </select>
+      </div>
+      <p class="models-toolbar-summary" data-models-summary>${renderModelsTableSummary(models.length, models.length)}</p>
+    </div>
+  `;
+}
+
+function renderModelsTablePanel(sectionId, models) {
+  return `
+    <div class="models-table-panel" data-model-section="${sectionId}">
+      ${renderModelsToolbar(sectionId, models)}
+      <div data-models-table-host>${renderModelsTable(sortCompatibleModels(models))}</div>
+    </div>
+  `;
+}
+
+function updateModelsTableSection(sectionElement) {
+  if (!sectionElement) {
+    return;
+  }
+
+  const sectionId = sectionElement.dataset.modelSection;
+  const models = modelSectionRegistry.get(sectionId) || [];
+  const search = sectionElement.querySelector("[data-model-search]")?.value || "";
+  const sort = sectionElement.querySelector("[data-model-sort]")?.value || "default";
+
+  const filteredModels = filterCompatibleModels(models, {
+    search
+  });
+  const sortedModels = sortCompatibleModels(filteredModels, sort);
+  const host = sectionElement.querySelector("[data-models-table-host]");
+  const summary = sectionElement.querySelector("[data-models-summary]");
+
+  if (host) {
+    host.innerHTML = renderModelsTable(sortedModels);
+  }
+  if (summary) {
+    summary.textContent = renderModelsTableSummary(filteredModels.length, models.length);
+  }
+}
+
+function bindResultsInteractions(dom) {
+  if (dom.resultsList.dataset.resultsInteractionsBound === "true") {
+    return;
+  }
+
+  const refreshFromEvent = (event) => {
+    const target = event.target;
+    if (
+      !target ||
+      !target.matches?.(
+        "[data-model-search], [data-model-sort]"
+      )
+    ) {
+      return;
+    }
+
+    updateModelsTableSection(target.closest("[data-model-section]"));
+  };
+
+  dom.resultsList.addEventListener("input", refreshFromEvent);
+  dom.resultsList.addEventListener("change", refreshFromEvent);
+  dom.resultsList.dataset.resultsInteractionsBound = "true";
+}
+
+function resetResultsModelSections() {
+  modelSectionRegistry.clear();
+  nextModelSectionId = 1;
+}
+
 function renderBrasse2Section(candidate, brasse2Models, realDiameters) {
   const models = getBrasse2ModelsForCandidate(candidate, brasse2Models);
 
@@ -1946,7 +2154,7 @@ function renderBrasse2Section(candidate, brasse2Models, realDiameters) {
     return `
       <section class="models-shell">
         <div>
-          <h4 class="section-title">Modeles BRASSE II</h4>
+          <h4 class="section-title">Modeles pré-sélectionnés</h4>
           <p class="section-subtitle" style="margin-bottom:0;">
             Filtrage sur les diametres BRASSE II admissibles pour ce calepinage.
           </p>
@@ -1960,21 +2168,13 @@ function renderBrasse2Section(candidate, brasse2Models, realDiameters) {
     `;
   }
 
-  const sortedModels = [...models].sort((a, b) => {
-    if (a.isSelectedDiameter !== b.isSelectedDiameter) {
-      return a.isSelectedDiameter ? -1 : 1;
-    }
-    if (Math.abs(b.compatibleOption.diameter - a.compatibleOption.diameter) > EPS) {
-      return b.compatibleOption.diameter - a.compatibleOption.diameter;
-    }
-    return compareComfort(a, b);
-  });
+  const sectionId = registerModelSection(models);
   const modelPicks = buildModelPicks(models);
 
   return `
     <section class="models-shell">
       <div>
-        <h4 class="section-title">Modeles BRASSE II</h4>
+        <h4 class="section-title">Modeles pré-sélectionnés</h4>
         <p class="section-subtitle" style="margin-bottom:0;">
           Filtrage sur tous les diametres admissibles. Les cartes ci-dessous lisent le meilleur FCC du calepinage,
           puis les indicateurs BRASSE a Vmax : confort direct debout, efficacite directe debout et acoustique.
@@ -1987,7 +2187,7 @@ function renderBrasse2Section(candidate, brasse2Models, realDiameters) {
 
       <details class="models-details">
         <summary>Voir tous les modeles BRASSE II compatibles (${models.length})</summary>
-        ${renderModelsTable(sortedModels)}
+        ${renderModelsTablePanel(sectionId, models)}
       </details>
     </section>
   `;
@@ -2073,27 +2273,12 @@ function candidateCard(candidate, rank, brasse2Models, realDiameters) {
   `;
 }
 
-function uniqueBest(candidates, picker) {
-  const candidate = picker(candidates);
-  return candidate || null;
-}
-
 function renderSummary(dom, room, candidates, brasse2Models) {
   const roomArea = room.length * room.width;
-  const best = candidates[0];
-  const bestBrasse2Matches = getBrasse2ModelsForCandidate(best, brasse2Models);
-  const bestStandard = uniqueBest(
-    candidates.filter((candidate) => candidate.mountMode.id === "standard"),
-    (items) => items[0]
-  );
-  const biggest = uniqueBest([...candidates], (items) =>
-    items.sort((a, b) => {
-      if (Math.abs(b.diameter - a.diameter) > EPS) {
-        return b.diameter - a.diameter;
-      }
-      return compareCandidates(a, b);
-    })[0]
-  );
+  const displayedCandidates = candidates.slice(0, 5);
+  const compatibleModels = getDistinctCompatibleModels(displayedCandidates, brasse2Models);
+  const diameterSummary = getMaxDiameterSummary(displayedCandidates);
+  const mountSummary = getNeutralMountSummary(displayedCandidates);
 
   dom.summaryGrid.innerHTML = [
     createSummaryCard(
@@ -2102,47 +2287,24 @@ function renderSummary(dom, room, candidates, brasse2Models) {
       `${formatSquareMeters(roomArea)} - HSP ${formatMeters(room.height)}`
     ),
     createSummaryCard(
-      "Recommandation uniformite",
-      `${best.fanCount} brasseur${best.fanCount > 1 ? "s" : ""}`,
-      `${best.nx} × ${best.ny} cellules - ${best.mountMode.label}`
+      "Options valides",
+      `${candidates.length}`,
+      `Montages visibles : ${mountSummary}`
     ),
     createSummaryCard(
-      "Diametre réel retenu",
-      formatMeters(best.diameter),
-      `Theorique max ${formatMeters(best.theoreticalMaxDiameter)} - FCC reel ${formatFactor(best.coverageFactor)}`
+      "Diametre max",
+      diameterSummary.value,
+      diameterSummary.detail
     ),
     createSummaryCard(
       "Base BRASSE II",
-      bestBrasse2Matches.length > 0
-        ? `${bestBrasse2Matches.length} modeles compatibles`
+      compatibleModels.length > 0
+        ? `${compatibleModels.length} modeles`
         : "Aucun modele compatible",
-      "Selection sur CE, CFE et LwA a Vmax"
+      "Compatibles avec les options affichees"
     )
   ].join("");
-
-  const highlightCards = [];
-
-  if (biggest && biggest.key !== best.key) {
-    highlightCards.push(
-      createSummaryCard(
-        "Diametre maximal absolu",
-        formatMeters(biggest.diameter),
-        `${biggest.fanCount} brasseur${biggest.fanCount > 1 ? "s" : ""} - theorique ${formatMeters(biggest.theoreticalMaxDiameter)}`
-      )
-    );
-  }
-
-  if (bestStandard && bestStandard.key !== best.key) {
-    highlightCards.push(
-      createSummaryCard(
-        "Meilleure variante standard",
-        `${bestStandard.nx} × ${bestStandard.ny}`,
-        `${formatMeters(bestStandard.diameter)} retenu - theorique ${formatMeters(bestStandard.theoreticalMaxDiameter)}`
-      )
-    );
-  }
-
-  dom.highlights.innerHTML = highlightCards.join("");
+  dom.highlights.innerHTML = "";
 }
 
 function renderStatusNote(
@@ -2195,6 +2357,7 @@ function renderStatusNote(
 }
 
 function renderResults(dom, candidates, brasse2Models, realDiameters) {
+  resetResultsModelSections();
   dom.resultsList.innerHTML = candidates
     .slice(0, 5)
     .map((candidate, index) => candidateCard(candidate, index + 1, brasse2Models, realDiameters))
@@ -2336,58 +2499,42 @@ function variabilityCard(design, rank, brasse2Models, realDiameters) {
 }
 
 function renderVariabilitySummary(dom, room, zones, designs, brasse2Models) {
-  const bestDesign = designs[0] || null;
-  const lowestFanCount = designs[0]
-    ? [...designs].sort((a, b) => a.fanCount - b.fanCount || compareVariabilityDesigns(a, b))[0]
-    : null;
-  const bestBrasse2Matches = bestDesign
-    ? getBrasse2ModelsForCandidate(bestDesign, brasse2Models)
-    : [];
+  const displayedDesigns = designs.slice(0, 5);
+  const targetArea = zones.reduce((sum, zone) => sum + zone.length * zone.width, 0);
+  const compatibleModels = getDistinctCompatibleModels(displayedDesigns, brasse2Models);
+  const diameterSummary = getMaxDiameterSummary(displayedDesigns);
+  const mountSummary = getNeutralMountSummary(displayedDesigns);
 
   dom.summaryGrid.innerHTML = [
     createSummaryCard(
-      "Strategie",
-      "Zones a couvrir",
-      `${zones.length} rectangle${zones.length > 1 ? "s" : ""} cible${zones.length > 1 ? "s" : ""}`
+      "Piece",
+      `${formatMeters(room.length)} × ${formatMeters(room.width)}`,
+      `${formatSquareMeters(room.length * room.width)} - HSP ${formatMeters(room.height)}`
     ),
     createSummaryCard(
-      "Recommandation",
-      bestDesign
-        ? `${bestDesign.fanCount} brasseur${bestDesign.fanCount > 1 ? "s" : ""}`
-        : "Aucune solution",
-      bestDesign
-        ? `${bestDesign.nx} × ${bestDesign.ny} trame - ${bestDesign.mountMode.label}`
-        : "Aucune trame valide"
+      "Zones cibles",
+      `${zones.length}`,
+      `${formatSquareMeters(targetArea)} a couvrir`
     ),
     createSummaryCard(
-      "Cellules actives",
-      bestDesign ? `${bestDesign.fanCount} / ${bestDesign.totalCells}` : "0",
-      bestDesign
-        ? `${formatMeters(bestDesign.cellLength)} × ${formatMeters(bestDesign.cellWidth)}`
-        : "Trame non validee"
+      "Options valides",
+      `${designs.length}`,
+      `Montages visibles : ${mountSummary}`
+    ),
+    createSummaryCard(
+      "Diametre max",
+      diameterSummary.value,
+      diameterSummary.detail
     ),
     createSummaryCard(
       "Base BRASSE II",
-      bestBrasse2Matches.length > 0
-        ? `${bestBrasse2Matches.length} modeles compatibles`
+      compatibleModels.length > 0
+        ? `${compatibleModels.length} modeles`
         : "Aucun modele compatible",
-      bestDesign ? `Diametre retenu ${formatMeters(bestDesign.diameter)}` : "Sans effet tant qu'aucune trame ne passe"
+      "Compatibles avec les options affichees"
     )
   ].join("");
-
-  const highlightCards = [];
-
-  if (lowestFanCount) {
-    highlightCards.push(
-      createSummaryCard(
-        "Moins de brasseurs",
-        `${lowestFanCount.fanCount}`,
-        `${lowestFanCount.nx} × ${lowestFanCount.ny} - ${formatMeters(lowestFanCount.diameter)}`
-      )
-    );
-  }
-
-  dom.highlights.innerHTML = highlightCards.join("");
+  dom.highlights.innerHTML = "";
 }
 
 function renderVariabilityStatusNote(
@@ -2454,6 +2601,7 @@ function renderVariabilityStatusNote(
 }
 
 function renderVariabilityResults(dom, designs, brasse2Models, realDiameters) {
+  resetResultsModelSections();
   dom.resultsList.innerHTML = designs
     .slice(0, 5)
     .map((design, index) => variabilityCard(design, index + 1, brasse2Models, realDiameters))
@@ -3160,6 +3308,7 @@ function resetResultsVisibility() {
   dom.resultsContent.classList.add("hidden");
   setExportAvailability(dom, false);
   setLatestReportState(state, null);
+  resetResultsModelSections();
 }
 
 function renderInvalidState(rawValues, issues, generatedAt) {
@@ -3517,6 +3666,7 @@ updateHeader({
   room: getRoomInputs()
 });
 setExportAvailability(dom, false);
+bindResultsInteractions(dom);
 initializeCatalogFilters(dom, brasse2Models);
 renderCatalog(dom, brasse2Models);
 toggleStrategyUI();

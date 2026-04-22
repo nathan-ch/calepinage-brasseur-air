@@ -2,13 +2,12 @@ import { escapeHtml, formatDateTime } from "../core/formatters.js";
 
 export function refreshReportHeader(
   dom,
-  { simulationName, strategyLabel, modesLabel, recommendation = "", generatedAt = new Date() }
+  { simulationName, generatedAt = new Date() }
 ) {
   dom.reportKicker.textContent = `Rapport de simulation • le ${formatDateTime(generatedAt)}`;
   dom.reportTitle.textContent = simulationName;
-  dom.reportContext.textContent = [strategyLabel, recommendation, modesLabel]
-    .filter(Boolean)
-    .join(" • ");
+  dom.reportContext.textContent = "";
+  dom.reportContext.classList.add("hidden");
 
   const metaItems = [];
   dom.reportMeta.innerHTML = metaItems

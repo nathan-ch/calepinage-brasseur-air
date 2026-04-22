@@ -26,8 +26,10 @@ import {
   resetCatalogFilters
 } from "./ui/catalog.js";
 import {
+  bindResultsInteractions,
   createSummaryCard,
   renderResults,
+  resetResultsModelSections,
   renderStatusNote,
   renderSummary,
   renderVariabilityResults,
@@ -130,6 +132,7 @@ function resetResultsVisibility() {
   dom.resultsContent.classList.add("hidden");
   setExportAvailability(dom, false);
   setLatestReportState(state, null);
+  resetResultsModelSections();
 }
 
 function renderInvalidState(rawValues, issues, generatedAt) {
@@ -487,6 +490,7 @@ updateHeader({
   room: getRoomInputs()
 });
 setExportAvailability(dom, false);
+bindResultsInteractions(dom);
 initializeCatalogFilters(dom, brasse2Models);
 renderCatalog(dom, brasse2Models);
 toggleStrategyUI();

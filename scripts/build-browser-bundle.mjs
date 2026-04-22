@@ -20,7 +20,6 @@ const sourceFiles = [
   "src/ui/catalog.js",
   "src/ui/planSvg.js",
   "src/ui/reportHeader.js",
-  "src/ui/zonesEditor.js",
   "src/ui/results.js",
   "src/report/pdf.js",
   "src/main.js"

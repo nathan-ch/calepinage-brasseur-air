@@ -123,14 +123,10 @@ function joinWithOr(values) {
 function getDomRefs() {
   return {
     form: document.getElementById("calculator-form"),
-    strategyInput: document.getElementById("strategy"),
     simulationNameInput: document.getElementById("simulation-name"),
     lengthInput: document.getElementById("length"),
     widthInput: document.getElementById("width"),
     heightInput: document.getElementById("height"),
-    zonesConfig: document.getElementById("zones-config"),
-    zonesList: document.getElementById("zones-list"),
-    addZoneButton: document.getElementById("add-zone-button"),
     allowStandardInput: document.getElementById("allow-standard"),
     allowLowInput: document.getElementById("allow-low"),
     resetButton: document.getElementById("reset-button"),
@@ -159,90 +155,10 @@ function getDomRefs() {
 }
 
 // src/app/state.js
-function clamp(value, min, max) {
-  return Math.min(max, Math.max(min, value));
-}
-
-function parseZoneValue(value, fallback) {
-  const parsed = Number.parseFloat(String(value).replace(",", "."));
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
-
-function normalizeZoneDraft(zone, room) {
-  const maxLength = Math.max(0.1, room.length);
-  const maxWidth = Math.max(0.1, room.width);
-
-  const length = clamp(parseZoneValue(zone.length, room.length / 2 || 1), 0.1, maxLength);
-  const width = clamp(parseZoneValue(zone.width, room.width / 2 || 1), 0.1, maxWidth);
-  const centerX = clamp(parseZoneValue(zone.centerX, room.length / 2 || 0.5), length / 2, room.length - length / 2);
-  const centerY = clamp(parseZoneValue(zone.centerY, room.width / 2 || 0.5), width / 2, room.width - width / 2);
-
-  return {
-    id: zone.id,
-    centerX,
-    centerY,
-    length,
-    width
-  };
-}
-
 function createAppState() {
   return {
-    nextZoneId: 1,
-    variabilityZones: [],
     latestReportState: null
   };
-}
-
-function getCurrentRoomDraft(dom) {
-  return {
-    length: Number.parseFloat(String(dom.lengthInput.value).replace(",", ".")) || 9,
-    width: Number.parseFloat(String(dom.widthInput.value).replace(",", ".")) || 5
-  };
-}
-
-function createDefaultZoneDraft(state, room) {
-  const zone = {
-    id: state.nextZoneId,
-    centerX: room.length / 2,
-    centerY: room.width / 2,
-    length: Math.max(1, room.length / 2),
-    width: Math.max(1, room.width / 2)
-  };
-  state.nextZoneId += 1;
-  return normalizeZoneDraft(zone, room);
-}
-
-function ensureVariabilityZones(state, room) {
-  if (state.variabilityZones.length === 0) {
-    state.variabilityZones = [createDefaultZoneDraft(state, room)];
-  }
-}
-
-function updateZoneDraft(state, room, zoneId, field, value) {
-  state.variabilityZones = state.variabilityZones.map((zone) => {
-    if (zone.id !== zoneId) {
-      return zone;
-    }
-    return normalizeZoneDraft(
-      {
-        ...zone,
-        [field]: parseZoneValue(value, zone[field])
-      },
-      room
-    );
-  });
-}
-
-function normalizeAllZoneDrafts(state, room) {
-  state.variabilityZones = state.variabilityZones.map((zone) => normalizeZoneDraft(zone, room));
-}
-
-function removeZoneDraft(state, zoneId) {
-  if (state.variabilityZones.length <= 1) {
-    return;
-  }
-  state.variabilityZones = state.variabilityZones.filter((zone) => zone.id !== zoneId);
 }
 
 function setLatestReportState(state, latestReportState) {
@@ -260,10 +176,6 @@ function getSelectableReportOptions(reportState) {
 
   if (reportState.kind === "uniformity-ok") {
     return reportState.candidates || [];
-  }
-
-  if (reportState.kind === "variability-ok") {
-    return reportState.designs || [];
   }
 
   return [];
@@ -312,30 +224,7 @@ function toggleLatestReportOptionSelection(state, optionKey, selected) {
 }
 
 function resetState(state) {
-  state.variabilityZones = [];
   state.latestReportState = null;
-}
-
-function getZoneBounds(zone, room) {
-  return {
-    centerXMin: zone.length / 2,
-    centerXMax: room.length - zone.length / 2,
-    centerYMin: zone.width / 2,
-    centerYMax: room.width - zone.width / 2,
-    lengthMin: 0.1,
-    lengthMax: room.length,
-    widthMin: 0.1,
-    widthMax: room.width
-  };
-}
-
-function getZoneInputSnapshot(zone) {
-  return {
-    centerX: formatInputValue(zone.centerX),
-    centerY: formatInputValue(zone.centerY),
-    length: formatInputValue(zone.length),
-    width: formatInputValue(zone.width)
-  };
 }
 
 // src/core/messages.js
@@ -374,24 +263,6 @@ function getCandidateWarnings(candidate) {
   }
   if (candidate.mountMode.id === "low-profile") {
     warnings.push(candidate.mountMode.penaltyText);
-  }
-  return warnings;
-}
-
-function getVariabilityWarnings(design) {
-  const warnings = [];
-  if (!design.recommendedSmallHeightMet && design.fanClass === "small") {
-    warnings.push(
-      "La recommandation d'aisance sur la hauteur sous pales (> 1,4 D) n'est pas atteinte."
-    );
-  }
-  if (design.mountMode.id === "low-profile") {
-    warnings.push(design.mountMode.penaltyText);
-  }
-  if (design.selectedCentersOutsideCount > 0) {
-    warnings.push(
-      `${design.selectedCentersOutsideCount} centre${design.selectedCentersOutsideCount > 1 ? "s" : ""} de cellule reste${design.selectedCentersOutsideCount > 1 ? "nt" : ""} hors des rectangles cibles, ce qui traduit le debordement de la trame.`
-    );
   }
   return warnings;
 }
@@ -677,133 +548,6 @@ function buildHeightFeasibility(height, mountFactor, dGeoMin, dGeoMax) {
   return intervals.filter((interval) => interval.upper > interval.lower + EPS);
 }
 
-function parseZoneDrafts(room, variabilityZones) {
-  const issues = [];
-  const zones = variabilityZones
-    .map((zone, index) => {
-      const centerX = Number.parseFloat(String(zone.centerX).replace(",", "."));
-      const centerY = Number.parseFloat(String(zone.centerY).replace(",", "."));
-      const length = Number.parseFloat(String(zone.length).replace(",", "."));
-      const width = Number.parseFloat(String(zone.width).replace(",", "."));
-
-      if (!(centerX > 0) || !(centerY > 0) || !(length > 0) || !(width > 0)) {
-        issues.push(`Zone ${index + 1} : renseignez des valeurs strictement positives.`);
-        return null;
-      }
-
-      const minX = centerX - length / 2;
-      const maxX = centerX + length / 2;
-      const minY = centerY - width / 2;
-      const maxY = centerY + width / 2;
-
-      if (
-        minX < -EPS ||
-        maxX > room.length + EPS ||
-        minY < -EPS ||
-        maxY > room.width + EPS
-      ) {
-        issues.push(`Zone ${index + 1} : le rectangle cible doit rester entierement dans le local.`);
-        return null;
-      }
-
-      return {
-        id: zone.id,
-        name: `Zone ${index + 1}`,
-        centerX,
-        centerY,
-        length,
-        width,
-        minX,
-        maxX,
-        minY,
-        maxY,
-        area: length * width
-      };
-    })
-    .filter(Boolean);
-
-  if (zones.length === 0) {
-    issues.push("Ajoutez au moins une zone cible.");
-  }
-
-  return { zones, issues };
-}
-
-function zonesOverlap(zoneA, zoneB) {
-  return (
-    zoneA.minX < zoneB.maxX - EPS &&
-    zoneA.maxX > zoneB.minX + EPS &&
-    zoneA.minY < zoneB.maxY - EPS &&
-    zoneA.maxY > zoneB.minY + EPS
-  );
-}
-
-function rectangleIntersectionArea(rectA, rectB) {
-  const overlapX = Math.max(0, Math.min(rectA.maxX, rectB.maxX) - Math.max(rectA.minX, rectB.minX));
-  const overlapY = Math.max(0, Math.min(rectA.maxY, rectB.maxY) - Math.max(rectA.minY, rectB.minY));
-  return overlapX * overlapY;
-}
-
-function pointInZones(x, y, zones) {
-  return zones.some(
-    (zone) =>
-      x >= zone.minX - EPS &&
-      x <= zone.maxX + EPS &&
-      y >= zone.minY - EPS &&
-      y <= zone.maxY + EPS
-  );
-}
-
-function computeRectanglesUnionArea(rectangles) {
-  if (rectangles.length === 0) {
-    return 0;
-  }
-
-  const xs = [...new Set(rectangles.flatMap((rectangle) => [rectangle.minX, rectangle.maxX]))].sort(
-    (a, b) => a - b
-  );
-  let area = 0;
-
-  for (let index = 0; index < xs.length - 1; index += 1) {
-    const x1 = xs[index];
-    const x2 = xs[index + 1];
-    const sliceWidth = x2 - x1;
-
-    if (sliceWidth <= EPS) {
-      continue;
-    }
-
-    const intervals = rectangles
-      .filter((rectangle) => rectangle.minX < x2 - EPS && rectangle.maxX > x1 + EPS)
-      .map((rectangle) => ({ minY: rectangle.minY, maxY: rectangle.maxY }))
-      .sort((a, b) => a.minY - b.minY);
-
-    if (intervals.length === 0) {
-      continue;
-    }
-
-    let coveredHeight = 0;
-    let currentStart = intervals[0].minY;
-    let currentEnd = intervals[0].maxY;
-
-    for (let intervalIndex = 1; intervalIndex < intervals.length; intervalIndex += 1) {
-      const interval = intervals[intervalIndex];
-      if (interval.minY <= currentEnd + EPS) {
-        currentEnd = Math.max(currentEnd, interval.maxY);
-      } else {
-        coveredHeight += currentEnd - currentStart;
-        currentStart = interval.minY;
-        currentEnd = interval.maxY;
-      }
-    }
-
-    coveredHeight += currentEnd - currentStart;
-    area += sliceWidth * coveredHeight;
-  }
-
-  return area;
-}
-
 /**
  * Evalue une trame uniforme et retourne une option complete si elle respecte
  * toutes les contraintes geometriques et de hauteur.
@@ -968,281 +712,6 @@ function getFallbackFlushCandidate(room, maxFans, realDiameters) {
   }
 
   return candidates.sort(compareCandidates)[0] || null;
-}
-
-function buildVariabilitySelection(room, zones, nx, ny) {
-  const cellLength = room.length / nx;
-  const cellWidth = room.width / ny;
-  const cellArea = cellLength * cellWidth;
-  const selectedCells = [];
-  const zoneSummaries = zones.map((zone) => ({
-    ...zone,
-    cellsCount: 0,
-    mobilizedArea: 0,
-    cellRefs: []
-  }));
-
-  for (let ix = 0; ix < nx; ix += 1) {
-    for (let iy = 0; iy < ny; iy += 1) {
-      const cell = {
-        key: `${ix}-${iy}`,
-        ix,
-        iy,
-        minX: ix * cellLength,
-        maxX: (ix + 1) * cellLength,
-        minY: iy * cellWidth,
-        maxY: (iy + 1) * cellWidth,
-        centerX: (ix + 0.5) * cellLength,
-        centerY: (iy + 0.5) * cellWidth
-      };
-
-      const overlappingZoneIds = [];
-      zoneSummaries.forEach((zoneSummary) => {
-        if (rectangleIntersectionArea(cell, zoneSummary) > EPS) {
-          overlappingZoneIds.push(zoneSummary.id);
-          zoneSummary.cellsCount += 1;
-          zoneSummary.cellRefs.push(`${ix + 1} × ${iy + 1}`);
-        }
-      });
-
-      if (overlappingZoneIds.length > 0) {
-        selectedCells.push({
-          ...cell,
-          overlappingZoneIds
-        });
-      }
-    }
-  }
-
-  return {
-    cellLength,
-    cellWidth,
-    cellArea,
-    selectedCells,
-    zoneSummaries: zoneSummaries.map((zoneSummary) => ({
-      ...zoneSummary,
-      mobilizedArea: zoneSummary.cellsCount * cellArea
-    }))
-  };
-}
-
-function getMinimumWallClearance(room, selectedCells) {
-  let bestDistance = Number.POSITIVE_INFINITY;
-  let bestCellKey = null;
-
-  for (const cell of selectedCells) {
-    const distance = Math.min(
-      cell.centerX,
-      room.length - cell.centerX,
-      cell.centerY,
-      room.width - cell.centerY
-    );
-
-    if (distance < bestDistance) {
-      bestDistance = distance;
-      bestCellKey = cell.key;
-    }
-  }
-
-  return {
-    distance: bestDistance,
-    cellKey: bestCellKey
-  };
-}
-
-function getMinimumCenterDistance(selectedCells) {
-  if (selectedCells.length < 2) {
-    return null;
-  }
-
-  let bestDistance = Number.POSITIVE_INFINITY;
-  let bestPair = null;
-
-  for (let index = 0; index < selectedCells.length; index += 1) {
-    for (let otherIndex = index + 1; otherIndex < selectedCells.length; otherIndex += 1) {
-      const distance = Math.hypot(
-        selectedCells[index].centerX - selectedCells[otherIndex].centerX,
-        selectedCells[index].centerY - selectedCells[otherIndex].centerY
-      );
-
-      if (distance < bestDistance) {
-        bestDistance = distance;
-        bestPair = [selectedCells[index].key, selectedCells[otherIndex].key];
-      }
-    }
-  }
-
-  return {
-    distance: bestDistance,
-    pair: bestPair
-  };
-}
-
-/**
- * Evalue une trame reguliere sur des zones cibles et retourne une variante si
- * les contraintes BRASSE restent satisfaites.
- */
-function evaluateVariabilityDesign(room, zones, nx, ny, mountMode, realDiameters) {
-  const { cellLength, cellWidth, cellArea, selectedCells, zoneSummaries } = buildVariabilitySelection(
-    room,
-    zones,
-    nx,
-    ny
-  );
-
-  if (selectedCells.length === 0) {
-    return null;
-  }
-
-  const cellShort = Math.min(cellLength, cellWidth);
-  const cellLong = Math.max(cellLength, cellWidth);
-  const formFactor = cellLong / cellShort;
-  const coverageMinDiameter = 0.2 * Math.sqrt(cellArea);
-  const coverageMaxDiameter = 0.4 * Math.sqrt(cellArea);
-  const wallInfo = getMinimumWallClearance(room, selectedCells);
-  const spacingInfo = getMinimumCenterDistance(selectedCells);
-  const interFanMaxDiameter = spacingInfo ? spacingInfo.distance / 2.5 : Number.POSITIVE_INFINITY;
-  const dGeoMax = Math.min(coverageMaxDiameter, wallInfo.distance, interFanMaxDiameter);
-
-  if (dGeoMax <= coverageMinDiameter + EPS) {
-    return null;
-  }
-
-  const intervals = buildHeightFeasibility(room.height, mountMode.factor, coverageMinDiameter, dGeoMax);
-  if (intervals.length === 0) {
-    return null;
-  }
-
-  const compatibleRealDiameters = getCompatibleRealDiameters(realDiameters, intervals, cellArea);
-  if (compatibleRealDiameters.length === 0) {
-    return null;
-  }
-
-  const bestInterval = intervals.reduce(
-    (best, current) => (!best || current.upper > best.upper ? current : best),
-    null
-  );
-  const theoreticalMaxDiameter = bestInterval.upper;
-  const selectedRealDiameter = compatibleRealDiameters[compatibleRealDiameters.length - 1];
-  const diameter = selectedRealDiameter.diameter;
-  const mountDistance = mountMode.factor * diameter;
-  const bladeHeight = room.height - mountDistance;
-  const coverageFactor = selectedRealDiameter.coverageFactor;
-  const recommendedSmallHeight = 1.4 * diameter;
-  const recommendedSmallHeightMet =
-    selectedRealDiameter.fanClass === "small"
-      ? bladeHeight >= recommendedSmallHeight - EPS
-      : true;
-  const targetArea = computeRectanglesUnionArea(zones);
-  const selectedArea = selectedCells.length * cellArea;
-  const spillArea = Math.max(0, selectedArea - targetArea);
-  const spillRatio = targetArea > EPS ? spillArea / targetArea : 0;
-  const selectedCentersInsideCount = selectedCells.filter((cell) =>
-    pointInZones(cell.centerX, cell.centerY, zones)
-  ).length;
-  const selectedCentersOutsideCount = selectedCells.length - selectedCentersInsideCount;
-
-  return {
-    key: `variability-${nx}x${ny}-${mountMode.id}`,
-    room,
-    mountMode,
-    nx,
-    ny,
-    totalCells: nx * ny,
-    fanCount: selectedCells.length,
-    cellLength,
-    cellWidth,
-    cellArea,
-    cellShort,
-    cellLong,
-    formFactor,
-    diameter,
-    theoreticalMaxDiameter,
-    coverageFactor,
-    mountDistance,
-    bladeHeight,
-    recommendedSmallHeightMet,
-    recommendedSmallHeight,
-    wallClearance: wallInfo.distance,
-    interFanSpacing: spacingInfo ? spacingInfo.distance : null,
-    geometryCaps: {
-      coverageMinDiameter,
-      coverageMaxDiameter,
-      wallMaxDiameter: wallInfo.distance,
-      interFanMaxDiameter
-    },
-    compatibleRealDiameters,
-    coordinates: selectedCells.map((cell) => ({ x: cell.centerX, y: cell.centerY })),
-    fanClass: selectedRealDiameter.fanClass,
-    targetZones: zones,
-    selectedCells,
-    zoneSummaries,
-    targetArea,
-    selectedArea,
-    spillArea,
-    spillRatio,
-    selectedCentersInsideCount,
-    selectedCentersOutsideCount,
-    minimumWallCellKey: wallInfo.cellKey,
-    minimumSpacingPair: spacingInfo ? spacingInfo.pair : null
-  };
-}
-
-function compareVariabilityDesigns(a, b) {
-  if (Math.abs(a.spillArea - b.spillArea) > EPS) {
-    return a.spillArea - b.spillArea;
-  }
-
-  if (a.selectedCentersOutsideCount !== b.selectedCentersOutsideCount) {
-    return a.selectedCentersOutsideCount - b.selectedCentersOutsideCount;
-  }
-
-  if (a.fanCount !== b.fanCount) {
-    return a.fanCount - b.fanCount;
-  }
-
-  const ffA = Math.abs(a.formFactor - 1);
-  const ffB = Math.abs(b.formFactor - 1);
-  if (Math.abs(ffA - ffB) > EPS) {
-    return ffA - ffB;
-  }
-
-  if (a.mountMode.id !== b.mountMode.id) {
-    return a.mountMode.id === "standard" ? -1 : 1;
-  }
-
-  if (Math.abs(b.diameter - a.diameter) > EPS) {
-    return b.diameter - a.diameter;
-  }
-
-  return a.totalCells - b.totalCells;
-}
-
-function enumerateVariabilityDesigns(
-  room,
-  zones,
-  modes,
-  realDiameters,
-  maxFans = MAX_GRID_FANS
-) {
-  const designs = [];
-
-  for (let nx = 1; nx <= maxFans; nx += 1) {
-    for (let ny = 1; ny <= maxFans; ny += 1) {
-      if (nx * ny > maxFans) {
-        continue;
-      }
-
-      for (const mode of modes) {
-        const design = evaluateVariabilityDesign(room, zones, nx, ny, mode, realDiameters);
-        if (design) {
-          designs.push(design);
-        }
-      }
-    }
-  }
-
-  return designs.sort(compareVariabilityDesigns);
 }
 
 // src/ui/catalog.js
@@ -1625,191 +1094,6 @@ function svgForCandidate(candidate) {
   `;
 }
 
-function svgForVariabilityDesign(design) {
-  const { roomAspectRatio, rotateForFit, canvasWidth, canvasHeight } = getPlanCanvasMetrics(design);
-  const paddingX = 28;
-  const paddingY = 28;
-  const displayRoomLength = rotateForFit ? design.room.width : design.room.length;
-  const displayRoomHeight = rotateForFit ? design.room.length : design.room.width;
-  const scale = Math.min(
-    (canvasWidth - paddingX * 2) / displayRoomLength,
-    (canvasHeight - paddingY * 2) / displayRoomHeight
-  );
-  const width = canvasWidth;
-  const height = canvasHeight;
-  const roomWidth = displayRoomLength * scale;
-  const roomHeight = displayRoomHeight * scale;
-  const roomX = (canvasWidth - roomWidth) / 2;
-  const roomY = (canvasHeight - roomHeight) / 2;
-  const compactMode = roomAspectRatio >= 2.4;
-  const labelFontSize = compactMode ? 9.2 : 10.5;
-  const compactOffset = compactMode ? 2 : 0;
-  const displayCellLength = rotateForFit ? design.cellWidth : design.cellLength;
-  const displayCellHeight = rotateForFit ? design.cellLength : design.cellWidth;
-  const displayNx = rotateForFit ? design.ny : design.nx;
-  const displayNy = rotateForFit ? design.nx : design.ny;
-  const transformPoint = (point) => (rotateForFit ? { x: point.y, y: point.x } : { x: point.x, y: point.y });
-  const transformRect = (rectangle) => {
-    const minPoint = transformPoint({ x: rectangle.minX, y: rectangle.minY });
-    const maxPoint = transformPoint({ x: rectangle.maxX, y: rectangle.maxY });
-
-    return {
-      x: roomX + Math.min(minPoint.x, maxPoint.x) * scale,
-      y: roomY + Math.min(minPoint.y, maxPoint.y) * scale,
-      width: Math.abs(maxPoint.x - minPoint.x) * scale,
-      height: Math.abs(maxPoint.y - minPoint.y) * scale
-    };
-  };
-
-  const displaySelectedCells = design.selectedCells.map((cell) => ({
-    ...cell,
-    displayCenter: transformPoint({ x: cell.centerX, y: cell.centerY }),
-    displayRect: transformRect(cell)
-  }));
-
-  const gridLines = [];
-  for (let i = 1; i < displayNx; i += 1) {
-    const x = roomX + i * displayCellLength * scale;
-    gridLines.push(
-      `<line x1="${x}" y1="${roomY}" x2="${x}" y2="${roomY + roomHeight}" stroke="rgba(29,47,44,0.18)" stroke-dasharray="6 5" />`
-    );
-  }
-  for (let j = 1; j < displayNy; j += 1) {
-    const y = roomY + j * displayCellHeight * scale;
-    gridLines.push(
-      `<line x1="${roomX}" y1="${y}" x2="${roomX + roomWidth}" y2="${y}" stroke="rgba(29,47,44,0.18)" stroke-dasharray="6 5" />`
-    );
-  }
-
-  const zoneShapes = design.targetZones
-    .map((zone, index) => {
-      const rectangle = transformRect(zone);
-      return `
-        <g>
-          <rect x="${rectangle.x}" y="${rectangle.y}" width="${rectangle.width}" height="${rectangle.height}" rx="10"
-            fill="rgba(31,79,130,0.08)" stroke="rgba(31,79,130,0.35)" stroke-width="1.5" />
-          <text x="${rectangle.x + 8}" y="${rectangle.y + 14}" font-size="10" fill="#1f4f82" font-weight="700">Z${index + 1}</text>
-        </g>
-      `;
-    })
-    .join("");
-
-  const selectedCellShapes = displaySelectedCells
-    .map(
-      (cell) => `
-        <rect x="${cell.displayRect.x}" y="${cell.displayRect.y}" width="${cell.displayRect.width}" height="${cell.displayRect.height}" rx="8"
-          fill="rgba(31,79,130,0.10)" stroke="rgba(31,79,130,0.38)" stroke-width="1.4" />
-      `
-    )
-    .join("");
-
-  const fans = displaySelectedCells
-    .map((cell, index) => {
-      const cx = roomX + cell.displayCenter.x * scale;
-      const cy = roomY + cell.displayCenter.y * scale;
-      const r = (design.diameter / 2) * scale;
-      return svgFanSymbol(cx, cy, r, index);
-    })
-    .join("");
-
-  const measurements = [];
-  const firstCell = displaySelectedCells[0];
-  if (firstCell) {
-    const firstCx = roomX + firstCell.displayCenter.x * scale;
-    const firstCy = roomY + firstCell.displayCenter.y * scale;
-    const radius = (design.diameter / 2) * scale;
-    measurements.push(
-      svgDimensionLine(
-        firstCx - radius,
-        firstCy - radius - (compactMode ? 8 : 12),
-        firstCx + radius,
-        firstCy - radius - (compactMode ? 8 : 12),
-        `D ${formatMeters(design.diameter)}`,
-        "middle",
-        0,
-        compactMode ? -6 : -8,
-        labelFontSize
-      )
-    );
-  }
-
-  if (design.minimumWallCellKey) {
-    const wallCell = displaySelectedCells.find((cell) => cell.key === design.minimumWallCellKey);
-    if (wallCell) {
-      const cx = roomX + wallCell.displayCenter.x * scale;
-      const cy = roomY + wallCell.displayCenter.y * scale;
-      const distances = [
-        { axis: "x", boundary: roomX, value: wallCell.displayCenter.x },
-        { axis: "x", boundary: roomX + roomWidth, value: displayRoomLength - wallCell.displayCenter.x },
-        { axis: "y", boundary: roomY, value: wallCell.displayCenter.y },
-        { axis: "y", boundary: roomY + roomHeight, value: displayRoomHeight - wallCell.displayCenter.y }
-      ].sort((a, b) => a.value - b.value);
-      const nearest = distances[0];
-
-      if (nearest.axis === "x") {
-        measurements.push(
-          svgDimensionLine(
-            nearest.boundary,
-            Math.min(height - 14, cy + (compactMode ? 20 : 24)),
-            cx,
-            Math.min(height - 14, cy + (compactMode ? 20 : 24)),
-            `Mur ${formatMeters(design.wallClearance)}`,
-            "middle",
-            0,
-            compactMode ? -6 : -8,
-            labelFontSize
-          )
-        );
-      } else {
-        measurements.push(
-          svgDimensionLine(
-            Math.min(width - 12, cx + (compactMode ? 20 : 24)),
-            nearest.boundary,
-            Math.min(width - 12, cx + (compactMode ? 20 : 24)),
-            cy,
-            `Mur ${formatMeters(design.wallClearance)}`,
-            "start",
-            8 + compactOffset,
-            -2,
-            labelFontSize
-          )
-        );
-      }
-    }
-  }
-
-  if (design.minimumSpacingPair) {
-    const firstSpacingCell = displaySelectedCells.find((cell) => cell.key === design.minimumSpacingPair[0]);
-    const secondSpacingCell = displaySelectedCells.find((cell) => cell.key === design.minimumSpacingPair[1]);
-    if (firstSpacingCell && secondSpacingCell) {
-      measurements.push(
-        svgDimensionLine(
-          roomX + firstSpacingCell.displayCenter.x * scale,
-          roomY + firstSpacingCell.displayCenter.y * scale,
-          roomX + secondSpacingCell.displayCenter.x * scale,
-          roomY + secondSpacingCell.displayCenter.y * scale,
-          `Entraxe ${formatMeters(design.interFanSpacing)}`,
-          "middle",
-          0,
-          compactMode ? -10 : -12,
-          labelFontSize
-        )
-      );
-    }
-  }
-
-  return `
-    <svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
-      <rect x="${roomX}" y="${roomY}" width="${roomWidth}" height="${roomHeight}" rx="18" fill="#faf5eb" stroke="rgba(29,47,44,0.2)" stroke-width="2.5" />
-      ${gridLines.join("")}
-      ${zoneShapes}
-      ${selectedCellShapes}
-      ${fans}
-      ${measurements.join("")}
-    </svg>
-  `;
-}
-
 // src/ui/reportHeader.js
 function refreshReportHeader(
   dom,
@@ -1845,89 +1129,6 @@ function setExportSelectionSummary(dom, text = "") {
 
   dom.exportSelectionSummary.textContent = text;
   dom.exportSelectionSummary.classList.toggle("hidden", !text);
-}
-
-// src/ui/zonesEditor.js
-function syncZoneCard(dom, zone, room) {
-  if (!zone || typeof dom.zonesList.querySelectorAll !== "function") {
-    return;
-  }
-
-  const bounds = getZoneBounds(zone, room);
-  const inputs = dom.zonesList.querySelectorAll(`[data-zone-id="${zone.id}"]`);
-  const fieldMap = {
-    centerX: { min: bounds.centerXMin, max: bounds.centerXMax },
-    centerY: { min: bounds.centerYMin, max: bounds.centerYMax },
-    length: { min: bounds.lengthMin, max: bounds.lengthMax },
-    width: { min: bounds.widthMin, max: bounds.widthMax }
-  };
-
-  inputs.forEach((input) => {
-    const field = input.dataset.field;
-    const fieldBounds = fieldMap[field];
-    if (!fieldBounds) {
-      return;
-    }
-    input.min = formatInputValue(fieldBounds.min);
-    input.max = formatInputValue(fieldBounds.max);
-    input.value = formatInputValue(zone[field]);
-  });
-}
-
-function renderZonesEditor(dom, state, room) {
-  dom.zonesList.innerHTML = state.variabilityZones
-    .map((zone, index) => {
-      const bounds = getZoneBounds(zone, room);
-      const values = getZoneInputSnapshot(zone);
-      const renderSliderField = (label, field, min, max) => `
-        <div class="field slider-field">
-          <label>${escapeHtml(label)}</label>
-          <div class="slider-row">
-            <input
-              type="range"
-              min="${formatInputValue(min)}"
-              max="${formatInputValue(max)}"
-              step="0.01"
-              value="${values[field]}"
-              data-zone-id="${zone.id}"
-              data-field="${field}"
-            >
-            <input
-              type="number"
-              min="${formatInputValue(min)}"
-              max="${formatInputValue(max)}"
-              step="0.01"
-              value="${values[field]}"
-              data-zone-id="${zone.id}"
-              data-field="${field}"
-            >
-          </div>
-        </div>
-      `;
-
-      return `
-        <article class="zone-card">
-          <div class="zone-card-head">
-            <strong>Zone ${index + 1}</strong>
-            <button
-              class="secondary"
-              type="button"
-              data-remove-zone="${zone.id}"
-              ${state.variabilityZones.length <= 1 ? "disabled" : ""}
-            >
-              Supprimer
-            </button>
-          </div>
-          <div class="zone-grid">
-            ${renderSliderField("Centre X (m)", "centerX", bounds.centerXMin, bounds.centerXMax)}
-            ${renderSliderField("Centre Y (m)", "centerY", bounds.centerYMin, bounds.centerYMax)}
-            ${renderSliderField("Longueur cible (m)", "length", bounds.lengthMin, bounds.lengthMax)}
-            ${renderSliderField("Largeur cible (m)", "width", bounds.widthMin, bounds.widthMax)}
-          </div>
-        </article>
-      `;
-    })
-    .join("");
 }
 
 // src/ui/results.js
@@ -2450,261 +1651,6 @@ function renderResults(dom, candidates, brasse2Models, realDiameters, selectedOp
     .join("");
 }
 
-function renderVariabilityZoneSummary(zoneSummary) {
-  return `
-    <section class="zone-result-card">
-      <div class="zone-result-head">
-        <div>
-          <h4>${zoneSummary.name}</h4>
-          <p>Cible ${formatMeters(zoneSummary.length)} × ${formatMeters(zoneSummary.width)}</p>
-        </div>
-      </div>
-
-      <div class="metric-grid">
-        <div class="metric-card">
-          <strong>Cellules actives</strong>
-          <span>${zoneSummary.cellsCount}</span>
-        </div>
-        <div class="metric-card">
-          <strong>Surface cible</strong>
-          <span>${formatSquareMeters(zoneSummary.area)}</span>
-        </div>
-        <div class="metric-card">
-          <strong>Surface mobilisee</strong>
-          <span>${formatSquareMeters(zoneSummary.mobilizedArea)}</span>
-        </div>
-        <div class="metric-card">
-          <strong>Trame touchee</strong>
-          <span>${zoneSummary.cellRefs.length > 0 ? zoneSummary.cellRefs.join(", ") : "Aucune"}</span>
-        </div>
-      </div>
-    </section>
-  `;
-}
-
-function variabilityCard(design, rank, brasse2Models, realDiameters, selectedOptionKeys) {
-  const warnings = getVariabilityWarnings(design);
-  const designBrasse2Models = getBrasse2ModelsForCandidate(design, brasse2Models);
-  const isSelectedForExport = selectedOptionKeys.has(design.key);
-
-  return `
-    <article class="result-card">
-      <div class="result-head">
-        <div>
-          <h3 class="result-title">Option ${rank}</h3>
-          <p class="result-subtitle">
-            ${design.fanCount} brasseur${design.fanCount > 1 ? "s" : ""} actif${design.fanCount > 1 ? "s" : ""} sur une trame
-            ${design.nx} × ${design.ny}, avec des cellules de ${formatMeters(design.cellLength)} × ${formatMeters(design.cellWidth)}.
-          </p>
-        </div>
-        ${renderExportOptionToggle(design.key, isSelectedForExport)}
-      </div>
-
-      <div class="result-grid">
-        <div class="plan-wrap" style="${planWrapStyle(design)}">${svgForVariabilityDesign(design)}</div>
-
-        <div class="stack">
-          <div class="metric-grid">
-            <div class="metric-card">
-              <strong>Diametre réel retenu</strong>
-              <span>${formatMeters(design.diameter)}</span>
-            </div>
-            <div class="metric-card">
-              <strong>Cellules actives</strong>
-              <span>${design.fanCount} / ${design.totalCells}</span>
-            </div>
-            <div class="metric-card">
-              <strong>Debordement hors zones</strong>
-              <span>${formatSquareMeters(design.spillArea)}</span>
-            </div>
-            <div class="metric-card">
-              <strong>FCC reel</strong>
-              <span>${formatFactor(design.coverageFactor)}</span>
-            </div>
-          </div>
-
-          <div class="detail-list">
-            <div class="detail-item">
-              <strong>Montage</strong>
-              <span>${design.mountMode.label}</span>
-            </div>
-            <div class="detail-item">
-              <strong>Hauteur sous pales</strong>
-              <span class="detail-value-stack">
-                <span>${formatMeters(design.bladeHeight)}</span>
-                <span class="detail-subtext">Plafond-pales: ${formatMeters(design.mountDistance)}</span>
-              </span>
-            </div>
-            <div class="detail-item">
-              <strong>Diametre theorique max</strong>
-              <span>${formatMeters(design.theoreticalMaxDiameter)}</span>
-            </div>
-            <div class="detail-item">
-              <strong>Mur limitant</strong>
-              <span>${formatMeters(design.wallClearance)} &gt; ${formatMeters(design.diameter)}</span>
-            </div>
-            <div class="detail-item">
-              <strong>Entraxe mini</strong>
-              <span>${design.interFanSpacing ? `${formatMeters(design.interFanSpacing)} &gt; ${formatNumber(2.5, 1)} × D` : "Non applicable (un seul brasseur)"}</span>
-            </div>
-            <div class="detail-item">
-              <strong>Surface cible</strong>
-              <span>${formatSquareMeters(design.targetArea)}</span>
-            </div>
-            <div class="detail-item">
-              <strong>Surface mobilisee</strong>
-              <span>${formatSquareMeters(design.selectedArea)}</span>
-            </div>
-            <div class="detail-item detail-item-stack">
-              <strong>Diametres BRASSE II admissibles (FCC &gt;= 0,2)</strong>
-              <span>${formatDiameterCmList(design.compatibleRealDiameters)}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      ${warnings.length > 0 ? `
-        <div class="notice warning">
-          <strong>Point d'attention.</strong>
-          ${warnings.join(" ")}
-        </div>
-      ` : ""}
-
-      <div class="zone-results">
-        ${design.zoneSummaries.map((zoneSummary) => renderVariabilityZoneSummary(zoneSummary)).join("")}
-      </div>
-
-      ${designBrasse2Models.length > 0 ? renderBrasse2Section(design, brasse2Models, realDiameters) : `
-        <section class="models-shell">
-          <div class="notice warning">
-            <strong>Aucun modele BRASSE II compatible.</strong>
-            Aucun modele de la base n'est disponible sur les diametres ${formatDiameterCmList(design.compatibleRealDiameters)}.
-          </div>
-        </section>
-      `}
-    </article>
-  `;
-}
-
-function renderVariabilitySummary(dom, room, zones, designs, brasse2Models) {
-  const displayedDesigns = designs.slice(0, 5);
-  const targetArea = zones.reduce((sum, zone) => sum + zone.length * zone.width, 0);
-  const compatibleModels = getDistinctCompatibleModels(displayedDesigns, brasse2Models);
-  const diameterSummary = getMaxDiameterSummary(displayedDesigns);
-  const mountSummary = getNeutralMountSummary(displayedDesigns);
-
-  dom.summaryGrid.innerHTML = [
-    createSummaryCard(
-      "Piece",
-      `${formatMeters(room.length)} × ${formatMeters(room.width)}`,
-      `${formatSquareMeters(room.length * room.width)} - HSP ${formatMeters(room.height)}`
-    ),
-    createSummaryCard(
-      "Zones cibles",
-      `${zones.length}`,
-      `${formatSquareMeters(targetArea)} a couvrir`
-    ),
-    createSummaryCard(
-      "Options valides",
-      `${designs.length}`,
-      `Montages visibles : ${mountSummary}`
-    ),
-    createSummaryCard(
-      "Diametre max",
-      diameterSummary.value,
-      diameterSummary.detail
-    ),
-    createSummaryCard(
-      "Base BRASSE II",
-      compatibleModels.length > 0
-        ? `${compatibleModels.length} modeles`
-        : "Aucun modele compatible",
-      "Compatibles avec les options affichees"
-    )
-  ].join("");
-  dom.highlights.innerHTML = "";
-}
-
-function renderVariabilityStatusNote(
-  dom,
-  room,
-  zones,
-  designs,
-  modes,
-  realDiameters
-) {
-  const notes = [];
-  const heightRequirementMessage = buildHeightDiameterRequirementMessage(room, modes, realDiameters);
-
-  const overlapPairs = [];
-  for (let index = 0; index < zones.length; index += 1) {
-    for (let otherIndex = index + 1; otherIndex < zones.length; otherIndex += 1) {
-      if (zonesOverlap(zones[index], zones[otherIndex])) {
-        overlapPairs.push(`${zones[index].name} / ${zones[otherIndex].name}`);
-      }
-    }
-  }
-
-  if (overlapPairs.length > 0) {
-    notes.push(`
-      <div class="notice warning">
-        <strong>Zones cibles en recouvrement.</strong>
-        ${overlapPairs.join(", ")}. Le moteur peut tout de meme proposer des cellules actives, mais les besoins ne
-        sont plus totalement distincts.
-      </div>
-    `);
-  }
-
-  if (designs.length === 0) {
-    notes.push(`
-      <div class="notice danger">
-        <strong>Aucune trame valide n'a ete trouvee.</strong>
-        L'outil a teste des maillages reguliers jusqu'a ${MAX_GRID_FANS} cellules, avec les regles BRASSE de FCC,
-        de distances et de hauteur.
-        ${heightRequirementMessage}
-      </div>
-    `);
-  } else {
-    const bestDesign = designs[0];
-    notes.push(`
-      <div class="notice">
-        <strong>Couverture de l'option de tete.</strong>
-        La trame retenue mobilise <code>${bestDesign.fanCount}</code> cellule${bestDesign.fanCount > 1 ? "s" : ""}
-        pour couvrir <code>${formatSquareMeters(bestDesign.targetArea)}</code> de zones cibles, avec un debordement
-        de <code>${formatSquareMeters(bestDesign.spillArea)}</code> hors rectangles.
-      </div>
-    `);
-
-    if (bestDesign.mountMode.id === "low-profile") {
-      notes.push(`
-        <div class="notice warning">
-          <strong>La meilleure variante passe en low-profile.</strong>
-          Le guide annonce alors une baisse de vitesse d'air d'environ 15 % par rapport au montage standard.
-        </div>
-      `);
-    }
-  }
-
-  dom.statusNote.innerHTML = notes.join("");
-}
-
-function renderVariabilityResults(
-  dom,
-  designs,
-  brasse2Models,
-  realDiameters,
-  selectedOptionKeys = []
-) {
-  resetResultsModelSections();
-  const selectedOptionKeySet = new Set(selectedOptionKeys);
-  dom.resultsList.innerHTML = designs
-    .slice(0, 5)
-    .map((design, index) =>
-      variabilityCard(design, index + 1, brasse2Models, realDiameters, selectedOptionKeySet)
-    )
-    .join("");
-}
-
 // src/report/pdf.js
 function getAllReportOptions(state) {
   if (!state) {
@@ -2713,10 +1659,6 @@ function getAllReportOptions(state) {
 
   if (state.kind === "uniformity-ok") {
     return state.candidates || [];
-  }
-
-  if (state.kind === "variability-ok") {
-    return state.designs || [];
   }
 
   return [];
@@ -2886,15 +1828,6 @@ function renderStudySummarySection(state, selectedOptions, brasse2Models) {
     ]
   ];
 
-  if (state.kind === "variability-ok") {
-    const targetArea = state.zones.reduce((sum, zone) => sum + zone.area, 0);
-    baseCards.splice(1, 0, [
-      "Zones cibles",
-      `${state.zones.length}`,
-      `${formatSquareMeters(targetArea)} a couvrir`
-    ]);
-  }
-
   return `
     <section class="report-block">
       <h2>Synthese de la piece etudiee</h2>
@@ -2907,7 +1840,7 @@ function renderSelectedOptionsOverview(state, selectedOptions) {
   if (selectedOptions.length === 0) {
     return `
       <section class="report-block">
-        <h2>Synthese de l'option retenue :</h2>
+        <h2>Synthese de ou des option(s) retenue(s) :</h2>
         <div class="report-note report-note-warning">
           <strong>Aucune option selectionnee</strong>
           <p>Cochez au moins une option dans l'outil pour l'inclure dans le rapport PDF.</p>
@@ -2927,7 +1860,7 @@ function renderSelectedOptionsOverview(state, selectedOptions) {
 
     return `
       <section class="report-block">
-        <h2>Synthese des options retenues :</h2>
+        <h2>Synthese de ou des option(s) retenue(s) :</h2>
         ${renderReportTable(
           ["Option", "Trame", "Diametre reel", "Montage", "FCC reel"],
           rows,
@@ -2936,50 +1869,6 @@ function renderSelectedOptionsOverview(state, selectedOptions) {
       </section>
     `;
   }
-
-  const rows = selectedOptions.map((option) => [
-    `Option ${getReportOptionNumber(state, option)}`,
-    `${option.nx} × ${option.ny}`,
-    `${option.fanCount} / ${option.totalCells}`,
-    formatMeters(option.diameter),
-    option.mountMode.label,
-    formatSquareMeters(option.spillArea)
-  ]);
-
-  return `
-    <section class="report-block">
-      <h2>Synthese des options retenues :</h2>
-      ${renderReportTable(
-        ["Option", "Trame", "Cellules actives", "Diametre reel", "Montage", "Debordement"],
-        rows,
-        true
-      )}
-    </section>
-  `;
-}
-
-function renderZonesSummaryTable(zones) {
-  if (!zones || zones.length === 0) {
-    return "";
-  }
-
-  const rows = zones.map((zone) => [
-    zone.name,
-    `${formatMeters(zone.length)} × ${formatMeters(zone.width)}`,
-    formatSquareMeters(zone.area),
-    `${formatMeters(zone.centerX)} ; ${formatMeters(zone.centerY)}`
-  ]);
-
-  return `
-    <section class="report-block">
-      <h2>Zones cibles</h2>
-      ${renderReportTable(
-        ["Zone", "Dimensions", "Surface", "Centre"],
-        rows,
-        true
-      )}
-    </section>
-  `;
 }
 
 function renderUniformityOptionPage(state, option, brasse2Models) {
@@ -3030,77 +1919,6 @@ function renderUniformityOptionPage(state, option, brasse2Models) {
   `;
 }
 
-function renderVariabilityZoneSummary(option) {
-  const rows = option.zoneSummaries.map((zoneSummary) => [
-    zoneSummary.name,
-    `${formatMeters(zoneSummary.length)} × ${formatMeters(zoneSummary.width)}`,
-    String(zoneSummary.cellsCount),
-    formatSquareMeters(zoneSummary.area),
-    formatSquareMeters(zoneSummary.mobilizedArea)
-  ]);
-
-  return `
-    <section class="report-section">
-      <h3>Zones couvertes</h3>
-      ${renderReportTable(
-        ["Zone", "Dimensions", "Cellules actives", "Surface cible", "Surface mobilisee"],
-        rows,
-        true
-      )}
-    </section>
-  `;
-}
-
-function renderVariabilityOptionPage(state, option, brasse2Models) {
-  const optionNumber = getReportOptionNumber(state, option);
-
-  return `
-    <section class="report-page report-option-page">
-      <div class="report-section-head">
-        <p class="report-section-kicker">Option ${optionNumber}</p>
-        <h2>${escapeHtml(`${option.nx} × ${option.ny} cellules`)}</h2>
-        <p>${escapeHtml(`${option.fanCount} cellule${option.fanCount > 1 ? "s" : ""} active${option.fanCount > 1 ? "s" : ""} • ${option.mountMode.label}`)}</p>
-      </div>
-
-      ${renderReportMetricGrid([
-        ["Diametre reel retenu", formatMeters(option.diameter)],
-        ["Cellules actives", `${option.fanCount} / ${option.totalCells}`],
-        ["FCC reel", formatFactor(option.coverageFactor)],
-        ["Hauteur sous pales", formatMeters(option.bladeHeight)],
-        ["Surface cible", formatSquareMeters(option.targetArea)],
-        ["Debordement", formatSquareMeters(option.spillArea)]
-      ])}
-
-      <div class="report-plan-block">
-        <div class="report-plan">${svgForVariabilityDesign(option)}</div>
-        <div class="report-side">
-          ${renderReportTable(
-            ["Lecture", "Valeur"],
-            [
-              ["Montage", option.mountMode.label],
-              ["Cellule", `${formatMeters(option.cellLength)} × ${formatMeters(option.cellWidth)}`],
-              ["Diametre theorique max", formatMeters(option.theoreticalMaxDiameter)],
-              ["Mur limitant", `${formatMeters(option.wallClearance)} > ${formatMeters(option.diameter)}`],
-              [
-                "Entraxe mini",
-                option.interFanSpacing
-                  ? `${formatMeters(option.interFanSpacing)} > 2,5 × D`
-                  : "Non applicable"
-              ],
-              ["Diametres admissibles", formatDiameterCmList(option.compatibleRealDiameters)]
-            ],
-            true
-          )}
-          ${renderReportWarningList(getVariabilityWarnings(option))}
-        </div>
-      </div>
-
-      ${renderVariabilityZoneSummary(option)}
-      ${renderModelHighlights(option, brasse2Models)}
-    </section>
-  `;
-}
-
 function renderReportFirstPage(state, selectedOptions, brasse2Models) {
   return `
     <section class="report-page report-first-page">
@@ -3115,7 +1933,6 @@ function renderReportFirstPage(state, selectedOptions, brasse2Models) {
       </header>
 
       ${renderStudySummarySection(state, selectedOptions, brasse2Models)}
-      ${state.kind === "variability-ok" ? renderZonesSummaryTable(state.zones) : ""}
       ${renderSelectedOptionsOverview(state, selectedOptions)}
     </section>
   `;
@@ -3143,10 +1960,6 @@ function renderEmptyOrInvalidReport(state) {
     title = "Aucune solution compatible";
     text =
       "Aucun cas standard ou low-profile n'a pu etre valide avec les regles BRASSE de FCC, de distances et de hauteur.";
-  } else if (state.kind === "variability-empty") {
-    title = "Aucune trame valide";
-    text =
-      "Le moteur n'a pas trouve de trame reguliere conforme aux regles BRASSE pour couvrir les zones cibles saisies.";
   }
 
   return `
@@ -3410,13 +2223,6 @@ function buildPdfReportDocument(state, brasse2Models) {
         .map((option) => renderUniformityOptionPage(state, option, brasse2Models))
         .join("")}
     `;
-  } else if (state.kind === "variability-ok") {
-    bodyContent = `
-      ${renderReportFirstPage(state, selectedOptions, brasse2Models)}
-      ${selectedOptions
-        .map((option) => renderVariabilityOptionPage(state, option, brasse2Models))
-        .join("")}
-    `;
   } else {
     bodyContent = renderEmptyOrInvalidReport(state);
   }
@@ -3493,10 +2299,6 @@ function getSimulationName() {
   return value || "Simulation sans nom";
 }
 
-function getStrategyLabel(strategy) {
-  return strategy === "variabilite" ? "Zones a couvrir" : "Recherche d'uniformite";
-}
-
 function getSelectedModes() {
   const modes = [];
   if (dom.allowStandardInput.checked) {
@@ -3521,25 +2323,9 @@ function getRoomInputs() {
   };
 }
 
-function toggleStrategyUI() {
-  const isVariability = dom.strategyInput.value === "variabilite";
-  dom.zonesConfig.classList.toggle("hidden", !isVariability);
-  if (isVariability) {
-    renderZonesPanel();
-  }
-}
-
-function renderZonesPanel() {
-  const roomDraft = getCurrentRoomDraft(dom);
-  ensureVariabilityZones(state, roomDraft);
-  normalizeAllZoneDrafts(state, roomDraft);
-  renderZonesEditor(dom, state, roomDraft);
-}
-
-function updateHeader({ strategy, room, recommendation = "", generatedAt = new Date() }) {
+function updateHeader({ room, recommendation = "", generatedAt = new Date() }) {
   refreshReportHeader(dom, {
     simulationName: getSimulationName(),
-    strategyLabel: getStrategyLabel(strategy),
     modesLabel: getSelectedModesLabel(),
     recommendation,
     generatedAt,
@@ -3574,22 +2360,16 @@ function updateExportControls() {
 
   const selectedOptions = getSelectedReportOptions(latestReportState);
   if (selectedOptions.length === 0) {
-    setExportAvailability(dom, latestReportState.kind !== "uniformity-ok" && latestReportState.kind !== "variability-ok");
+    setExportAvailability(dom, latestReportState.kind !== "uniformity-ok");
     setExportSelectionSummary(
       dom,
-      latestReportState.kind === "uniformity-ok" || latestReportState.kind === "variability-ok"
-        ? "Aucune option selectionnee pour le PDF"
-        : ""
+      latestReportState.kind === "uniformity-ok" ? "Aucune option selectionnee pour le PDF" : ""
     );
     return;
   }
 
   const selectableCount =
-    latestReportState.kind === "uniformity-ok"
-      ? latestReportState.candidates.length
-      : latestReportState.kind === "variability-ok"
-        ? latestReportState.designs.length
-        : 0;
+    latestReportState.kind === "uniformity-ok" ? latestReportState.candidates.length : 0;
 
   setExportAvailability(dom, true);
   setExportSelectionSummary(
@@ -3611,14 +2391,12 @@ function resetResultsVisibility() {
 
 function renderInvalidState(rawValues, issues, generatedAt) {
   updateHeader({
-    strategy: rawValues.strategy,
     room: rawValues,
     recommendation: "Calcul impossible",
     generatedAt
   });
   setLatestReportState(state, {
     kind: "invalid",
-    strategy: rawValues.strategy,
     simulationName: getSimulationName(),
     room: rawValues,
     modesLabel: getSelectedModesLabel(),
@@ -3638,44 +2416,8 @@ function renderInvalidState(rawValues, issues, generatedAt) {
   dom.resultsContent.classList.remove("hidden");
 }
 
-function renderVariabilityInvalidZones(room, zones, zoneIssues, generatedAt) {
-  updateHeader({
-    strategy: dom.strategyInput.value,
-    room,
-    recommendation: "Zones invalides",
-    generatedAt
-  });
-  setLatestReportState(state, {
-    kind: "variability-empty",
-    strategy: dom.strategyInput.value,
-    simulationName: getSimulationName(),
-    room,
-    zones,
-    modesLabel: getSelectedModesLabel(),
-    generatedAt,
-    context: "Zones invalides",
-    issues: zoneIssues
-  });
-  dom.summaryGrid.innerHTML = [
-    createSummaryCard("Strategie", "Zones a couvrir", "Corrigez les rectangles cibles"),
-    createSummaryCard("Local", `${formatMeters(room.length)} × ${formatMeters(room.width)}`, `HSP ${formatMeters(room.height)}`),
-    createSummaryCard("Zones", `${zones.length}`, "Chaque rectangle doit rester dans le local"),
-    createSummaryCard("Resultat", "Calcul bloque", "Impossible d'evaluer les zones a couvrir")
-  ].join("");
-  dom.highlights.innerHTML = "";
-  dom.statusNote.innerHTML = `
-    <div class="notice danger">
-      <strong>Zones invalides.</strong>
-      ${zoneIssues.join(" ")}
-    </div>
-  `;
-  dom.resultsList.innerHTML = "";
-  dom.resultsContent.classList.remove("hidden");
-}
-
 function renderUniformityEmpty(room, fallbackFlush, generatedAt) {
   updateHeader({
-    strategy: dom.strategyInput.value,
     room,
     recommendation: "Aucune solution compatible",
     generatedAt
@@ -3684,7 +2426,6 @@ function renderUniformityEmpty(room, fallbackFlush, generatedAt) {
   const heightRequirementMessage = buildHeightDiameterRequirementMessage(room, modes, realDiameters);
   setLatestReportState(state, {
     kind: "uniformity-empty",
-    strategy: dom.strategyInput.value,
     simulationName: getSimulationName(),
     room,
     modesLabel: getSelectedModesLabel(modes),
@@ -3709,12 +2450,7 @@ function renderUniformityEmpty(room, fallbackFlush, generatedAt) {
 }
 
 function render() {
-  toggleStrategyUI();
-
-  const rawValues = {
-    strategy: dom.strategyInput.value,
-    ...getRoomInputs()
-  };
+  const rawValues = getRoomInputs();
   const issues = validateInputs(rawValues);
   const generatedAt = new Date();
 
@@ -3725,74 +2461,6 @@ function render() {
     return;
   }
 
-  if (rawValues.strategy === "variabilite") {
-    const room = {
-      length: rawValues.length,
-      width: rawValues.width,
-      height: rawValues.height
-    };
-    const { zones, issues: zoneIssues } = parseZoneDrafts(room, state.variabilityZones);
-
-    if (zoneIssues.length > 0) {
-      renderVariabilityInvalidZones(room, zones, zoneIssues, generatedAt);
-      return;
-    }
-
-    const modes = getSelectedModes();
-    const designs = enumerateVariabilityDesigns(room, zones, modes, realDiameters, MAX_GRID_FANS);
-    updateHeader({
-      strategy: rawValues.strategy,
-      room,
-      recommendation: designs[0]
-        ? `Option recommandee : ${designs[0].fanCount} brasseur${designs[0].fanCount > 1 ? "s" : ""} sur ${designs[0].nx} × ${designs[0].ny}`
-        : "Aucune trame valide",
-      generatedAt
-    });
-    const heightRequirementMessage = buildHeightDiameterRequirementMessage(room, modes, realDiameters);
-    setLatestReportState(
-      state,
-      designs.length > 0
-        ? {
-            kind: "variability-ok",
-            strategy: rawValues.strategy,
-            simulationName: getSimulationName(),
-            room,
-            zones,
-            designs: designs.slice(0, 5),
-            selectedOptionKeys: createSelectedReportOptionKeys(designs.slice(0, 5)),
-            modesLabel: getSelectedModesLabel(modes),
-            generatedAt,
-            context: `Zones a couvrir • option recommandee : ${designs[0].fanCount} brasseur${designs[0].fanCount > 1 ? "s" : ""} sur ${designs[0].nx} × ${designs[0].ny}`
-          }
-        : {
-            kind: "variability-empty",
-            strategy: rawValues.strategy,
-            simulationName: getSimulationName(),
-            room,
-            zones,
-            modesLabel: getSelectedModesLabel(modes),
-            generatedAt,
-            context: "Aucune trame valide",
-            issues: [
-              "Aucune trame reguliere n'a respecte les regles BRASSE avec les rectangles saisis.",
-              ...(heightRequirementMessage ? [heightRequirementMessage] : [])
-            ]
-          }
-    );
-    renderVariabilitySummary(dom, room, zones, designs, brasse2Models);
-    renderVariabilityStatusNote(dom, room, zones, designs, modes, realDiameters);
-    renderVariabilityResults(
-      dom,
-      designs,
-      brasse2Models,
-      realDiameters,
-      state.latestReportState?.selectedOptionKeys || []
-    );
-    updateExportControls();
-    dom.resultsContent.classList.remove("hidden");
-    return;
-  }
-
   const room = {
     length: rawValues.length,
     width: rawValues.width,
@@ -3800,7 +2468,8 @@ function render() {
   };
   const modes = getSelectedModes();
   const candidates = enumerateCandidates(room, MAX_GRID_FANS, modes, realDiameters);
-  const fallbackFlush = candidates.length === 0 ? getFallbackFlushCandidate(room, MAX_GRID_FANS, realDiameters) : null;
+  const fallbackFlush =
+    candidates.length === 0 ? getFallbackFlushCandidate(room, MAX_GRID_FANS, realDiameters) : null;
 
   if (candidates.length === 0) {
     renderUniformityEmpty(room, fallbackFlush, generatedAt);
@@ -3808,14 +2477,12 @@ function render() {
   }
 
   updateHeader({
-    strategy: rawValues.strategy,
     room,
     recommendation: `Option recommandee : ${candidates[0].nx} × ${candidates[0].ny} - ${candidates[0].fanCount} brasseur${candidates[0].fanCount > 1 ? "s" : ""}`,
     generatedAt
   });
   setLatestReportState(state, {
     kind: "uniformity-ok",
-    strategy: rawValues.strategy,
     simulationName: getSimulationName(),
     room,
     candidates: candidates.slice(0, 5),
@@ -3842,35 +2509,19 @@ dom.form.addEventListener("submit", (event) => {
   render();
 });
 
-dom.strategyInput.addEventListener("change", () => {
-  toggleStrategyUI();
-  render();
-});
-
 dom.resetButton.addEventListener("click", () => {
   dom.lengthInput.value = "9";
   dom.widthInput.value = "5";
   dom.heightInput.value = "2.5";
   dom.simulationNameInput.value = "";
-  dom.strategyInput.value = "uniformite";
   dom.allowStandardInput.checked = true;
   dom.allowLowInput.checked = true;
   resetState(state);
-  renderZonesPanel();
   render();
-});
-
-dom.addZoneButton.addEventListener("click", () => {
-  state.variabilityZones.push(createDefaultZoneDraft(state, getCurrentRoomDraft(dom)));
-  renderZonesPanel();
-  if (dom.strategyInput.value === "variabilite") {
-    render();
-  }
 });
 
 dom.simulationNameInput.addEventListener("input", () => {
   updateHeader({
-    strategy: dom.strategyInput.value,
     room: getRoomInputs()
   });
 });
@@ -3900,62 +2551,6 @@ dom.catalogResetButton.addEventListener("click", () => {
   renderCatalog(dom, brasse2Models);
 });
 
-dom.zonesList.addEventListener("input", (event) => {
-  const target = event.target;
-  if (!target?.dataset || target.type !== "range") {
-    return;
-  }
-  const zoneId = Number(target.dataset.zoneId);
-  const field = target.dataset.field;
-  if (!Number.isFinite(zoneId) || !field) {
-    return;
-  }
-
-  const roomDraft = getCurrentRoomDraft(dom);
-  updateZoneDraft(state, roomDraft, zoneId, field, target.value);
-  const zone = state.variabilityZones.find((item) => item.id === zoneId);
-  syncZoneCard(dom, zone, roomDraft);
-});
-
-dom.zonesList.addEventListener("change", (event) => {
-  const target = event.target;
-  if (!target?.dataset) {
-    return;
-  }
-  const zoneId = Number(target.dataset.zoneId);
-  const field = target.dataset.field;
-  if (!Number.isFinite(zoneId) || !field) {
-    return;
-  }
-
-  const roomDraft = getCurrentRoomDraft(dom);
-  updateZoneDraft(state, roomDraft, zoneId, field, target.value);
-  const zone = state.variabilityZones.find((item) => item.id === zoneId);
-  syncZoneCard(dom, zone, roomDraft);
-  if (dom.strategyInput.value === "variabilite") {
-    render();
-  }
-});
-
-dom.zonesList.addEventListener("click", (event) => {
-  const removeButton =
-    event.target && typeof event.target.closest === "function"
-      ? event.target.closest("[data-remove-zone]")
-      : null;
-  if (!removeButton) {
-    return;
-  }
-  const zoneId = Number(removeButton.dataset.removeZone);
-  if (!Number.isFinite(zoneId)) {
-    return;
-  }
-  removeZoneDraft(state, zoneId);
-  renderZonesPanel();
-  if (dom.strategyInput.value === "variabilite") {
-    render();
-  }
-});
-
 dom.resultsList.addEventListener("change", (event) => {
   const target = event.target;
   if (!target?.matches?.("[data-export-option-key]")) {
@@ -3966,25 +2561,15 @@ dom.resultsList.addEventListener("change", (event) => {
   updateExportControls();
 });
 
-[dom.lengthInput, dom.widthInput].forEach((input) => {
-  input.addEventListener("change", () => {
-    if (dom.strategyInput.value !== "variabilite") {
-      return;
-    }
-    normalizeAllZoneDrafts(state, getCurrentRoomDraft(dom));
-    renderZonesPanel();
-    render();
-  });
-});
-
-[dom.heightInput, dom.allowStandardInput, dom.allowLowInput].forEach((input) => {
-  input.addEventListener("change", () => {
-    render();
-  });
-});
+[dom.lengthInput, dom.widthInput, dom.heightInput, dom.allowStandardInput, dom.allowLowInput].forEach(
+  (input) => {
+    input.addEventListener("change", () => {
+      render();
+    });
+  }
+);
 
 updateHeader({
-  strategy: dom.strategyInput.value,
   room: getRoomInputs()
 });
 setExportAvailability(dom, false);
@@ -3992,6 +2577,5 @@ setExportSelectionSummary(dom, "");
 bindResultsInteractions(dom);
 initializeCatalogFilters(dom, brasse2Models);
 renderCatalog(dom, brasse2Models);
-toggleStrategyUI();
 render();
 })();

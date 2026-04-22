@@ -39,21 +39,3 @@ export function getCandidateWarnings(candidate) {
   }
   return warnings;
 }
-
-export function getVariabilityWarnings(design) {
-  const warnings = [];
-  if (!design.recommendedSmallHeightMet && design.fanClass === "small") {
-    warnings.push(
-      "La recommandation d'aisance sur la hauteur sous pales (> 1,4 D) n'est pas atteinte."
-    );
-  }
-  if (design.mountMode.id === "low-profile") {
-    warnings.push(design.mountMode.penaltyText);
-  }
-  if (design.selectedCentersOutsideCount > 0) {
-    warnings.push(
-      `${design.selectedCentersOutsideCount} centre${design.selectedCentersOutsideCount > 1 ? "s" : ""} de cellule reste${design.selectedCentersOutsideCount > 1 ? "nt" : ""} hors des rectangles cibles, ce qui traduit le debordement de la trame.`
-    );
-  }
-  return warnings;
-}

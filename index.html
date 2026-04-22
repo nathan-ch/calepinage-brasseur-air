@@ -34,11 +34,6 @@
             <table class="method-table">
               <tbody>
                 <tr>
-                  <th>Stratégie de départ</th>
-                  <td>Le site reprend la question d'entrée du guide : recherche d'uniformité dans tout le local, ou besoin de rafraîchir des zones de façon différenciée selon l'usage.</td>
-                  <td>Guide BRASSE, p. 4/12</td>
-                </tr>
-                <tr>
                   <th>Diamètre à rechercher</th>
                   <td>Le diamètre du brasseur doit être le plus grand possible ; c'est le premier critère d'aide à la décision repris dans le moteur.</td>
                   <td>Guide BRASSE, p. 5/12, règle n°1</td>
@@ -95,19 +90,11 @@
                 </tr>
                 <tr>
                   <th>Départages propres au site</th>
-                  <td>En mode uniformité, après validation BRASSE, le site classe les options par diamètre réel retenu le plus grand, puis par facteur de forme le plus proche de 1, puis par FCC réel le plus proche de 0,4. À égalité, le montage standard est privilégié. En mode zones, le classement supplémentaire sur le débordement et le nombre de brasseurs est propre au site.</td>
+                  <td>Après validation BRASSE, le site classe les options par diamètre réel retenu le plus grand, puis par facteur de forme le plus proche de 1, puis par FCC réel le plus proche de 0,4. À égalité, le montage standard est privilégié.</td>
                   <td>Ordre BRASSE : p. 5/12 et p. 11/12 ; départages complémentaires propres au site</td>
                 </tr>
               </tbody>
             </table>
-          </div>
-
-          <div class="notice warning">
-            <strong>Mode zone à couvrir</strong>
-            Le guide BRASSE distingue bien le besoin d'uniformité et le besoin de variabilité, mais ne donne pas de
-            procédure géométrique complète pour redécouper automatiquement des rectangles cibles. Dans ce mode, le site
-            génère donc une trame régulière propre au site, puis applique les contrôles BRASSE sur le diamètre, le FCC,
-            les distances, le montage et la hauteur.
           </div>
         </div>
       </details>
@@ -119,26 +106,6 @@
           <h2 class="section-title">Données du local</h2>
 
           <form id="calculator-form">
-            <div class="field">
-              <div class="label-with-help">
-                <label for="strategy">Strategie</label>
-                <div class="help-wrap">
-                  <button class="help-button" type="button" aria-label="Aide sur la stratégie">?</button>
-                  <div class="help-tooltip" role="tooltip">
-                    <strong>Recherche d'uniformité</strong>
-                    Le site cherche une implantation régulière pour obtenir une vitesse d'air la plus uniforme possible dans tout le local.
-                    <br><br>
-                    <strong>Zones à couvrir</strong>
-                    Le site part de rectangles cibles déterminés par l'utilisateur, puis applique les règles BRASSE à ces zones. Il ne s'agit pas d'une mode opératoire décrit dans le guide BRASSE.
-                  </div>
-                </div>
-              </div>
-              <select id="strategy" name="strategy">
-                <option value="uniformite">Recherche d'uniformite</option>
-                <option value="variabilite">Zones à couvrir</option>
-              </select>
-            </div>
-
             <div class="field">
               <label for="simulation-name">Nom de la simulation</label>
               <input id="simulation-name" name="simulationName" type="text" maxlength="120" placeholder="Ex. Classe 1 école XXX commune XXX">
@@ -159,21 +126,6 @@
               <label for="height">Hauteur sous plafond (m)</label>
               <input id="height" name="height" type="number" min="0.1" step="0.01" value="2.5">
             </div>
-
-            <section id="zones-config" class="zone-editor hidden">
-              <div class="zone-editor-head">
-                <strong>Zones à couvrir</strong>
-                <p>
-                  Chaque zone est décrite par son rectangle cible. Le moteur cherche ensuite une trame reguliere et
-                  active seulement les cellules nécessaires pour couvrir ces rectangles.
-                </p>
-              </div>
-              <div id="zones-list" class="zone-list"></div>
-              <div class="zone-inline">
-                <button class="secondary" type="button" id="add-zone-button">Ajouter une zone</button>
-                <p class="hint">Coordonnées exprimées depuis le coin bas-gauche du local.</p>
-              </div>
-            </section>
 
             <div class="stack">
               <span class="hint">Montages étudiés</span>

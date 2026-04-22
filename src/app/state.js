@@ -1,0 +1,118 @@
+import { formatInputValue } from "../core/formatters.js";
+
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function parseZoneValue(value, fallback) {
+  const parsed = Number.parseFloat(String(value).replace(",", "."));
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function normalizeZoneDraft(zone, room) {
+  const maxLength = Math.max(0.1, room.length);
+  const maxWidth = Math.max(0.1, room.width);
+
+  const length = clamp(parseZoneValue(zone.length, room.length / 2 || 1), 0.1, maxLength);
+  const width = clamp(parseZoneValue(zone.width, room.width / 2 || 1), 0.1, maxWidth);
+  const centerX = clamp(parseZoneValue(zone.centerX, room.length / 2 || 0.5), length / 2, room.length - length / 2);
+  const centerY = clamp(parseZoneValue(zone.centerY, room.width / 2 || 0.5), width / 2, room.width - width / 2);
+
+  return {
+    id: zone.id,
+    centerX,
+    centerY,
+    length,
+    width
+  };
+}
+
+export function createAppState() {
+  return {
+    nextZoneId: 1,
+    variabilityZones: [],
+    latestReportState: null
+  };
+}
+
+export function getCurrentRoomDraft(dom) {
+  return {
+    length: Number.parseFloat(String(dom.lengthInput.value).replace(",", ".")) || 9,
+    width: Number.parseFloat(String(dom.widthInput.value).replace(",", ".")) || 5
+  };
+}
+
+export function createDefaultZoneDraft(state, room) {
+  const zone = {
+    id: state.nextZoneId,
+    centerX: room.length / 2,
+    centerY: room.width / 2,
+    length: Math.max(1, room.length / 2),
+    width: Math.max(1, room.width / 2)
+  };
+  state.nextZoneId += 1;
+  return normalizeZoneDraft(zone, room);
+}
+
+export function ensureVariabilityZones(state, room) {
+  if (state.variabilityZones.length === 0) {
+    state.variabilityZones = [createDefaultZoneDraft(state, room)];
+  }
+}
+
+export function updateZoneDraft(state, room, zoneId, field, value) {
+  state.variabilityZones = state.variabilityZones.map((zone) => {
+    if (zone.id !== zoneId) {
+      return zone;
+    }
+    return normalizeZoneDraft(
+      {
+        ...zone,
+        [field]: parseZoneValue(value, zone[field])
+      },
+      room
+    );
+  });
+}
+
+export function normalizeAllZoneDrafts(state, room) {
+  state.variabilityZones = state.variabilityZones.map((zone) => normalizeZoneDraft(zone, room));
+}
+
+export function removeZoneDraft(state, zoneId) {
+  if (state.variabilityZones.length <= 1) {
+    return;
+  }
+  state.variabilityZones = state.variabilityZones.filter((zone) => zone.id !== zoneId);
+}
+
+export function setLatestReportState(state, latestReportState) {
+  state.latestReportState = latestReportState;
+}
+
+export function resetState(state) {
+  state.variabilityZones = [];
+  state.latestReportState = null;
+}
+
+export function getZoneBounds(zone, room) {
+  return {
+    centerXMin: zone.length / 2,
+    centerXMax: room.length - zone.length / 2,
+    centerYMin: zone.width / 2,
+    centerYMax: room.width - zone.width / 2,
+    lengthMin: 0.1,
+    lengthMax: room.length,
+    widthMin: 0.1,
+    widthMax: room.width
+  };
+}
+
+export function getZoneInputSnapshot(zone) {
+  return {
+    centerX: formatInputValue(zone.centerX),
+    centerY: formatInputValue(zone.centerY),
+    length: formatInputValue(zone.length),
+    width: formatInputValue(zone.width)
+  };
+}

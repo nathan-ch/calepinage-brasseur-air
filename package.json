@@ -1,0 +1,21 @@
+{
+  "name": "site-statique-calepinage-brasseur",
+  "version": "0.1.0",
+  "description": "Outil statique de calepinage de brasseurs d'air base sur les guides BRASSE.",
+  "type": "module",
+  "scripts": {
+    "build:browser": "node ./scripts/build-browser-bundle.mjs",
+    "dev": "serve . -l 3000",
+    "lint": "eslint src test data/brasse2-data.js eslint.config.js",
+    "format": "prettier --write \"*.{js,json,md,html}\" \"src/**/*.js\" \"data/**/*.js\" \"styles/**/*.css\" \"test/**/*.js\"",
+    "test": "node --test",
+    "check": "npm run lint && npm run test && npm run build:browser"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.25.0",
+    "eslint": "^9.25.0",
+    "globals": "^15.15.0",
+    "prettier": "^3.5.3",
+    "serve": "^14.2.4"
+  }
+}

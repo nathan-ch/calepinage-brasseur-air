@@ -22,6 +22,7 @@ export function getDomRefs() {
     reportTitle: document.getElementById("report-title"),
     reportContext: document.getElementById("report-context"),
     reportMeta: document.getElementById("report-meta"),
+    exportSelectionSummary: document.getElementById("export-selection-summary"),
     exportPdfButton: document.getElementById("export-pdf-button"),
     catalogSearchInput: document.getElementById("catalog-search"),
     catalogBrandInput: document.getElementById("catalog-brand"),

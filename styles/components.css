@@ -186,6 +186,25 @@
   font-size: 0.92rem;
 }
 
+.export-option-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: #f9fafb;
+  color: var(--ink);
+  font-size: 0.86rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.export-option-toggle input {
+  margin: 0;
+  accent-color: var(--accent);
+}
+
 .result-grid {
   display: grid;
   gap: 12px;

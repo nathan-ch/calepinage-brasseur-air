@@ -273,10 +273,16 @@ label {
 }
 
 .report-actions {
-  display: flex;
-  gap: 10px;
-  align-items: flex-start;
-  flex-wrap: wrap;
+  display: grid;
+  gap: 6px;
+  justify-items: end;
+}
+
+.export-selection-summary {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+  text-align: right;
 }
 
 .hidden {

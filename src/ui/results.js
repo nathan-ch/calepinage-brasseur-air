@@ -151,6 +151,15 @@ export function createSummaryCard(label, value, detail) {
   `;
 }
 
+function renderExportOptionToggle(optionKey, checked) {
+  return `
+    <label class="export-option-toggle">
+      <input type="checkbox" data-export-option-key="${optionKey}" ${checked ? "checked" : ""}>
+      <span>Inclure dans le PDF</span>
+    </label>
+  `;
+}
+
 function renderModelCard(title, model) {
   if (!model) {
     return "";
@@ -362,8 +371,9 @@ function renderBrasse2Section(candidate, brasse2Models, realDiameters) {
   `;
 }
 
-function candidateCard(candidate, rank, brasse2Models, realDiameters) {
+function candidateCard(candidate, rank, brasse2Models, realDiameters, selectedOptionKeys) {
   const warnings = getCandidateWarnings(candidate);
+  const isSelectedForExport = selectedOptionKeys.has(candidate.key);
 
   return `
     <article class="result-card">
@@ -376,6 +386,7 @@ function candidateCard(candidate, rank, brasse2Models, realDiameters) {
             avec un diametre BRASSE II retenu de ${formatMeters(candidate.diameter)}.
           </p>
         </div>
+        ${renderExportOptionToggle(candidate.key, isSelectedForExport)}
       </div>
 
       <div class="result-grid">
@@ -525,11 +536,14 @@ export function renderStatusNote(
   dom.statusNote.innerHTML = notes.join("");
 }
 
-export function renderResults(dom, candidates, brasse2Models, realDiameters) {
+export function renderResults(dom, candidates, brasse2Models, realDiameters, selectedOptionKeys = []) {
   resetResultsModelSections();
+  const selectedOptionKeySet = new Set(selectedOptionKeys);
   dom.resultsList.innerHTML = candidates
     .slice(0, 5)
-    .map((candidate, index) => candidateCard(candidate, index + 1, brasse2Models, realDiameters))
+    .map((candidate, index) =>
+      candidateCard(candidate, index + 1, brasse2Models, realDiameters, selectedOptionKeySet)
+    )
     .join("");
 }
 
@@ -565,9 +579,10 @@ function renderVariabilityZoneSummary(zoneSummary) {
   `;
 }
 
-function variabilityCard(design, rank, brasse2Models, realDiameters) {
+function variabilityCard(design, rank, brasse2Models, realDiameters, selectedOptionKeys) {
   const warnings = getVariabilityWarnings(design);
   const designBrasse2Models = getBrasse2ModelsForCandidate(design, brasse2Models);
+  const isSelectedForExport = selectedOptionKeys.has(design.key);
 
   return `
     <article class="result-card">
@@ -579,6 +594,7 @@ function variabilityCard(design, rank, brasse2Models, realDiameters) {
             ${design.nx} × ${design.ny}, avec des cellules de ${formatMeters(design.cellLength)} × ${formatMeters(design.cellWidth)}.
           </p>
         </div>
+        ${renderExportOptionToggle(design.key, isSelectedForExport)}
       </div>
 
       <div class="result-grid">
@@ -769,10 +785,19 @@ export function renderVariabilityStatusNote(
   dom.statusNote.innerHTML = notes.join("");
 }
 
-export function renderVariabilityResults(dom, designs, brasse2Models, realDiameters) {
+export function renderVariabilityResults(
+  dom,
+  designs,
+  brasse2Models,
+  realDiameters,
+  selectedOptionKeys = []
+) {
   resetResultsModelSections();
+  const selectedOptionKeySet = new Set(selectedOptionKeys);
   dom.resultsList.innerHTML = designs
     .slice(0, 5)
-    .map((design, index) => variabilityCard(design, index + 1, brasse2Models, realDiameters))
+    .map((design, index) =>
+      variabilityCard(design, index + 1, brasse2Models, realDiameters, selectedOptionKeySet)
+    )
     .join("");
 }

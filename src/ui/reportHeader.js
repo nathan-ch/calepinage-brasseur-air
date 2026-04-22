@@ -26,3 +26,12 @@ export function refreshReportHeader(
 export function setExportAvailability(dom, enabled) {
   dom.exportPdfButton.disabled = !enabled;
 }
+
+export function setExportSelectionSummary(dom, text = "") {
+  if (!dom.exportSelectionSummary) {
+    return;
+  }
+
+  dom.exportSelectionSummary.textContent = text;
+  dom.exportSelectionSummary.classList.toggle("hidden", !text);
+}

@@ -1,9 +1,17 @@
-import { getReportModelHighlights } from "../core/brasse2.js";
-import { getCandidateWarnings, getVariabilityWarnings } from "../core/messages.js";
+import { getSelectedReportOptions } from "../app/state.js";
+import {
+  getBrasse2ModelsForCandidate,
+  getReportModelHighlights
+} from "../core/brasse2.js";
+import {
+  getCandidateWarnings,
+  getVariabilityWarnings
+} from "../core/messages.js";
 import {
   escapeHtml,
   formatDateTime,
   formatDb,
+  formatDiameterCm,
   formatDiameterCmList,
   formatFactor,
   formatMeters,
@@ -11,7 +19,60 @@ import {
   formatSquareMeters,
   formatTemp
 } from "../core/formatters.js";
-import { svgForCandidate, svgForVariabilityDesign } from "../ui/planSvg.js";
+import {
+  svgForCandidate,
+  svgForVariabilityDesign
+} from "../ui/planSvg.js";
+
+function getAllReportOptions(state) {
+  if (!state) {
+    return [];
+  }
+
+  if (state.kind === "uniformity-ok") {
+    return state.candidates || [];
+  }
+
+  if (state.kind === "variability-ok") {
+    return state.designs || [];
+  }
+
+  return [];
+}
+
+function getReportOptionNumber(state, option) {
+  const index = getAllReportOptions(state).findIndex((item) => item.key === option.key);
+  return index >= 0 ? index + 1 : null;
+}
+
+function getDistinctCompatibleModels(options, brasse2Models) {
+  const modelsById = new Map();
+
+  options.forEach((option) => {
+    getBrasse2ModelsForCandidate(option, brasse2Models).forEach((model) => {
+      modelsById.set(model.id, model);
+    });
+  });
+
+  return [...modelsById.values()];
+}
+
+function getMaxDiameterSummary(options) {
+  const diameters = options.map((option) => option.diameter).filter(Number.isFinite);
+
+  if (diameters.length === 0) {
+    return {
+      value: "Aucun",
+      detail: "Aucun diametre reel compatible"
+    };
+  }
+
+  const maxDiameter = Math.max(...diameters);
+  return {
+    value: `${formatDiameterCm(maxDiameter)} cm`,
+    detail: "Plus grand diametre reel des options exportees"
+  };
+}
 
 function renderReportWarningList(items) {
   if (!items || items.length === 0) {
@@ -28,51 +89,21 @@ function renderReportWarningList(items) {
   `;
 }
 
-function renderReportModelHighlights(candidate, brasse2Models) {
-  const highlights = getReportModelHighlights(candidate, brasse2Models);
-  if (highlights.length === 0) {
-    return `
-      <div class="report-note">
-        <strong>Modeles BRASSE II</strong>
-        <p>Aucun modele compatible dans la base embarquee sur les diametres admissibles.</p>
-      </div>
-    `;
-  }
-
+function renderReportSummaryCards(items) {
   return `
-    <section class="report-section">
-      <h4>Selection BRASSE II</h4>
-      <table class="report-table compact">
-        <thead>
-          <tr>
-            <th>Lecture</th>
-            <th>Marque / modele</th>
-            <th>Diam.</th>
-            <th>FCC</th>
-            <th>CE dir.</th>
-            <th>CFE dir.</th>
-            <th>LwA</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${highlights
-            .map(
-              (entry) => `
-                <tr>
-                  <td>${escapeHtml(entry.title)}</td>
-                  <td>${escapeHtml(`${entry.model.brand} ${entry.model.model}`)}</td>
-                  <td>${escapeHtml(String(entry.model.diameterCm))}</td>
-                  <td>${escapeHtml(Number.isFinite(entry.model.compatibleOption.coverageFactor) ? formatFactor(entry.model.compatibleOption.coverageFactor) : "—")}</td>
-                  <td>${escapeHtml(formatTemp(entry.model.ceDirDeboutMax))}</td>
-                  <td>${escapeHtml(`${formatNumber(entry.model.cfeDirDeboutMax, 4)} °C/W`)}</td>
-                  <td>${escapeHtml(formatDb(entry.model.lwaMaxDbA))}</td>
-                </tr>
-              `
-            )
-            .join("")}
-        </tbody>
-      </table>
-    </section>
+    <div class="report-summary-grid">
+      ${items
+        .map(
+          ([label, value, detail]) => `
+            <article class="report-summary-card">
+              <strong>${escapeHtml(label)}</strong>
+              <span>${escapeHtml(value)}</span>
+              <small>${escapeHtml(detail)}</small>
+            </article>
+          `
+        )
+        .join("")}
+    </div>
   `;
 }
 
@@ -93,206 +124,446 @@ function renderReportMetricGrid(items) {
   `;
 }
 
-function renderUniformityReportOptions(candidates, brasse2Models) {
-  return candidates
-    .map(
-      (candidate, index) => `
-        <section class="report-option">
-          <div class="report-option-head">
-            <div>
-              <h3>Option ${index + 1}</h3>
-              <p>${escapeHtml(`${candidate.fanCount} brasseur${candidate.fanCount > 1 ? "s" : ""} sur ${candidate.nx} × ${candidate.ny} cellules - ${candidate.mountMode.label}`)}</p>
-            </div>
-          </div>
-
-          ${renderReportMetricGrid([
-            ["Diametre retenu", formatMeters(candidate.diameter)],
-            ["Diametre theorique max", formatMeters(candidate.theoreticalMaxDiameter)],
-            ["FCC reel", formatFactor(candidate.coverageFactor)],
-            ["Cellule", `${formatMeters(candidate.cellLength)} × ${formatMeters(candidate.cellWidth)}`],
-            ["Mur limitant", formatMeters(candidate.wallClearance)],
-            ["Entraxe mini", candidate.interFanSpacing ? formatMeters(candidate.interFanSpacing) : "Non applicable"]
-          ])}
-
-          <div class="report-plan-block">
-            <div class="report-plan">${svgForCandidate(candidate)}</div>
-            <div class="report-side">
-              <table class="report-table">
-                <tbody>
-                  <tr>
-                    <th>Montage</th>
-                    <td>${escapeHtml(`${candidate.mountMode.label} (${formatMeters(candidate.mountDistance)})`)}</td>
-                  </tr>
-                  <tr>
-                    <th>Hauteur sous pales</th>
-                    <td>${escapeHtml(formatMeters(candidate.bladeHeight))}</td>
-                  </tr>
-                  <tr>
-                    <th>Facteur de forme</th>
-                    <td>${escapeHtml(formatFactor(candidate.formFactor))}</td>
-                  </tr>
-                  <tr>
-                    <th>Diametres admissibles</th>
-                    <td>${escapeHtml(formatDiameterCmList(candidate.compatibleRealDiameters))}</td>
-                  </tr>
-                </tbody>
-              </table>
-              ${renderReportWarningList(getCandidateWarnings(candidate))}
-            </div>
-          </div>
-
-          ${renderReportModelHighlights(candidate, brasse2Models)}
-        </section>
-      `
-    )
-    .join("");
+function renderReportTable(headers, rows, compact = false) {
+  return `
+    <table class="report-table${compact ? " compact" : ""}">
+      <thead>
+        <tr>
+          ${headers.map((header) => `<th>${escapeHtml(header)}</th>`).join("")}
+        </tr>
+      </thead>
+      <tbody>
+        ${rows
+          .map(
+            (row) => `
+              <tr>
+                ${row.map((cell) => `<td>${escapeHtml(cell)}</td>`).join("")}
+              </tr>
+            `
+          )
+          .join("")}
+      </tbody>
+    </table>
+  `;
 }
 
-function renderVariabilityZoneSummaryTable(design) {
+function renderModelHighlights(option, brasse2Models) {
+  const highlights = getReportModelHighlights(option, brasse2Models);
+  if (highlights.length === 0) {
+    return `
+      <div class="report-note">
+        <strong>Modeles pre-selectionnes</strong>
+        <p>Aucun modele compatible dans la base BRASSE II embarquee sur les diametres admissibles de cette option.</p>
+      </div>
+    `;
+  }
+
+  const rows = highlights.map((entry) => [
+    entry.title,
+    `${entry.model.brand} ${entry.model.model}`,
+    `${entry.model.diameterCm} cm`,
+    Number.isFinite(entry.model.compatibleOption.coverageFactor)
+      ? formatFactor(entry.model.compatibleOption.coverageFactor)
+      : "—",
+    formatTemp(entry.model.ceDirDeboutMax),
+    `${formatNumber(entry.model.cfeDirDeboutMax, 4)} °C/W`,
+    formatDb(entry.model.lwaMaxDbA)
+  ]);
+
   return `
     <section class="report-section">
-      <h4>Zones couvertes</h4>
-      <table class="report-table compact">
-        <thead>
-          <tr>
-            <th>Zone</th>
-            <th>Dimensions</th>
-            <th>Cellules actives</th>
-            <th>Surface cible</th>
-            <th>Surface mobilisee</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${design.zoneSummaries
-            .map(
-              (zoneSummary) => `
-                <tr>
-                  <td>${escapeHtml(zoneSummary.name)}</td>
-                  <td>${escapeHtml(`${formatMeters(zoneSummary.length)} × ${formatMeters(zoneSummary.width)}`)}</td>
-                  <td>${escapeHtml(String(zoneSummary.cellsCount))}</td>
-                  <td>${escapeHtml(formatSquareMeters(zoneSummary.area))}</td>
-                  <td>${escapeHtml(formatSquareMeters(zoneSummary.mobilizedArea))}</td>
-                </tr>
-              `
-            )
-            .join("")}
-        </tbody>
-      </table>
+      <h3>Modeles pre-selectionnes</h3>
+      ${renderReportTable(
+        ["Lecture", "Marque / modele", "Diam.", "FCC", "CE dir.", "CFE dir.", "LwA"],
+        rows,
+        true
+      )}
     </section>
   `;
 }
 
-function renderVariabilityReportOptions(designs, brasse2Models) {
-  return designs
-    .map(
-      (design, index) => `
-        <section class="report-option">
-          <div class="report-option-head">
-            <div>
-              <h3>Option ${index + 1}</h3>
-              <p>${escapeHtml(`${design.fanCount} brasseur${design.fanCount > 1 ? "s" : ""} actifs sur ${design.nx} × ${design.ny} cellules - ${design.mountMode.label}`)}</p>
-            </div>
-          </div>
+function renderStudySummarySection(state, selectedOptions, brasse2Models) {
+  const roomArea = state.room.length * state.room.width;
+  const compatibleModels = getDistinctCompatibleModels(selectedOptions, brasse2Models);
+  const maxDiameterSummary = getMaxDiameterSummary(selectedOptions);
+  const baseCards = [
+    [
+      "Piece",
+      `${formatMeters(state.room.length)} × ${formatMeters(state.room.width)}`,
+      `${formatSquareMeters(roomArea)} - HSP ${formatMeters(state.room.height)}`
+    ],
+    [
+      "Diametre max",
+      maxDiameterSummary.value,
+      maxDiameterSummary.detail
+    ],
+    [
+      "Base BRASSE II",
+      compatibleModels.length > 0 ? `${compatibleModels.length} modeles` : "Aucun modele",
+      "Compatibles avec les options exportees"
+    ]
+  ];
 
-          ${renderReportMetricGrid([
-            ["Diametre retenu", formatMeters(design.diameter)],
-            ["Trame", `${design.nx} × ${design.ny}`],
-            ["Cellules actives", `${design.fanCount} / ${design.totalCells}`],
-            ["FCC reel", formatFactor(design.coverageFactor)],
-            ["Surface cible", formatSquareMeters(design.targetArea)],
-            ["Debordement", formatSquareMeters(design.spillArea)]
-          ])}
+  if (state.kind === "variability-ok") {
+    const targetArea = state.zones.reduce((sum, zone) => sum + zone.area, 0);
+    baseCards.splice(1, 0, [
+      "Zones cibles",
+      `${state.zones.length}`,
+      `${formatSquareMeters(targetArea)} a couvrir`
+    ]);
+  }
 
-          <div class="report-plan-block">
-            <div class="report-plan">${svgForVariabilityDesign(design)}</div>
-            <div class="report-side">
-              <table class="report-table">
-                <tbody>
-                  <tr>
-                    <th>Cellule</th>
-                    <td>${escapeHtml(`${formatMeters(design.cellLength)} × ${formatMeters(design.cellWidth)}`)}</td>
-                  </tr>
-                  <tr>
-                    <th>Montage</th>
-                    <td>${escapeHtml(`${design.mountMode.label} (${formatMeters(design.mountDistance)})`)}</td>
-                  </tr>
-                  <tr>
-                    <th>Diametres admissibles</th>
-                    <td>${escapeHtml(formatDiameterCmList(design.compatibleRealDiameters))}</td>
-                  </tr>
-                  <tr>
-                    <th>Mur limitant</th>
-                    <td>${escapeHtml(formatMeters(design.wallClearance))}</td>
-                  </tr>
-                  <tr>
-                    <th>Entraxe mini</th>
-                    <td>${escapeHtml(design.interFanSpacing ? formatMeters(design.interFanSpacing) : "Non applicable")}</td>
-                  </tr>
-                </tbody>
-              </table>
-              ${renderReportWarningList(getVariabilityWarnings(design))}
-            </div>
-          </div>
+  return `
+    <section class="report-block">
+      <h2>Synthese de la piece etudiee</h2>
+      ${renderReportSummaryCards(baseCards)}
+    </section>
+  `;
+}
 
-          ${renderVariabilityZoneSummaryTable(design)}
-          ${renderReportModelHighlights(design, brasse2Models)}
-        </section>
-      `
-    )
-    .join("");
+function renderSelectedOptionsOverview(state, selectedOptions) {
+  if (selectedOptions.length === 0) {
+    return `
+      <section class="report-block">
+        <h2>Synthese de ou des option(s) retenue(s) :</h2>
+        <div class="report-note report-note-warning">
+          <strong>Aucune option selectionnee</strong>
+          <p>Cochez au moins une option dans l'outil pour l'inclure dans le rapport PDF.</p>
+        </div>
+      </section>
+    `;
+  }
+
+  if (state.kind === "uniformity-ok") {
+    const rows = selectedOptions.map((option) => [
+      `Option ${getReportOptionNumber(state, option)}`,
+      `${option.nx} × ${option.ny}`,
+      formatMeters(option.diameter),
+      option.mountMode.label,
+      formatFactor(option.coverageFactor)
+    ]);
+
+    return `
+      <section class="report-block">
+        <h2>Synthese de ou des option(s) retenue(s) :</h2>
+        ${renderReportTable(
+          ["Option", "Trame", "Diametre reel", "Montage", "FCC reel"],
+          rows,
+          true
+        )}
+      </section>
+    `;
+  }
+
+  const rows = selectedOptions.map((option) => [
+    `Option ${getReportOptionNumber(state, option)}`,
+    `${option.nx} × ${option.ny}`,
+    `${option.fanCount} / ${option.totalCells}`,
+    formatMeters(option.diameter),
+    option.mountMode.label,
+    formatSquareMeters(option.spillArea)
+  ]);
+
+  return `
+    <section class="report-block">
+      <h2>Synthese de ou des option(s) retenue(s) :</h2>
+      ${renderReportTable(
+        ["Option", "Trame", "Cellules actives", "Diametre reel", "Montage", "Debordement"],
+        rows,
+        true
+      )}
+    </section>
+  `;
+}
+
+function renderZonesSummaryTable(zones) {
+  if (!zones || zones.length === 0) {
+    return "";
+  }
+
+  const rows = zones.map((zone) => [
+    zone.name,
+    `${formatMeters(zone.length)} × ${formatMeters(zone.width)}`,
+    formatSquareMeters(zone.area),
+    `${formatMeters(zone.centerX)} ; ${formatMeters(zone.centerY)}`
+  ]);
+
+  return `
+    <section class="report-block">
+      <h2>Zones cibles</h2>
+      ${renderReportTable(
+        ["Zone", "Dimensions", "Surface", "Centre"],
+        rows,
+        true
+      )}
+    </section>
+  `;
+}
+
+function renderUniformityOptionPage(state, option, brasse2Models) {
+  const optionNumber = getReportOptionNumber(state, option);
+
+  return `
+    <section class="report-page report-option-page">
+      <div class="report-section-head">
+        <p class="report-section-kicker">Option ${optionNumber}</p>
+        <h2>${escapeHtml(`${option.nx} × ${option.ny} cellules`)}</h2>
+        <p>${escapeHtml(`${option.fanCount} brasseur${option.fanCount > 1 ? "s" : ""} • ${option.mountMode.label}`)}</p>
+      </div>
+
+      ${renderReportMetricGrid([
+        ["Diametre reel retenu", formatMeters(option.diameter)],
+        ["Diametre theorique max", formatMeters(option.theoreticalMaxDiameter)],
+        ["Facteur de forme", formatFactor(option.formFactor)],
+        ["FCC reel", formatFactor(option.coverageFactor)],
+        ["Hauteur sous pales", formatMeters(option.bladeHeight)],
+        ["Plafond-pales", formatMeters(option.mountDistance)]
+      ])}
+
+      <div class="report-plan-block">
+        <div class="report-plan">${svgForCandidate(option)}</div>
+        <div class="report-side">
+          ${renderReportTable(
+            ["Lecture", "Valeur"],
+            [
+              ["Montage", option.mountMode.label],
+              ["Cellule", `${formatMeters(option.cellLength)} × ${formatMeters(option.cellWidth)}`],
+              ["Mur limitant", `${formatMeters(option.wallClearance)} > ${formatMeters(option.diameter)}`],
+              [
+                "Entraxe mini",
+                option.interFanSpacing
+                  ? `${formatMeters(option.interFanSpacing)} > 2,5 × D`
+                  : "Non applicable"
+              ],
+              ["Diametres admissibles", formatDiameterCmList(option.compatibleRealDiameters)]
+            ],
+            true
+          )}
+          ${renderReportWarningList(getCandidateWarnings(option))}
+        </div>
+      </div>
+
+      ${renderModelHighlights(option, brasse2Models)}
+    </section>
+  `;
+}
+
+function renderVariabilityZoneSummary(option) {
+  const rows = option.zoneSummaries.map((zoneSummary) => [
+    zoneSummary.name,
+    `${formatMeters(zoneSummary.length)} × ${formatMeters(zoneSummary.width)}`,
+    String(zoneSummary.cellsCount),
+    formatSquareMeters(zoneSummary.area),
+    formatSquareMeters(zoneSummary.mobilizedArea)
+  ]);
+
+  return `
+    <section class="report-section">
+      <h3>Zones couvertes</h3>
+      ${renderReportTable(
+        ["Zone", "Dimensions", "Cellules actives", "Surface cible", "Surface mobilisee"],
+        rows,
+        true
+      )}
+    </section>
+  `;
+}
+
+function renderVariabilityOptionPage(state, option, brasse2Models) {
+  const optionNumber = getReportOptionNumber(state, option);
+
+  return `
+    <section class="report-page report-option-page">
+      <div class="report-section-head">
+        <p class="report-section-kicker">Option ${optionNumber}</p>
+        <h2>${escapeHtml(`${option.nx} × ${option.ny} cellules`)}</h2>
+        <p>${escapeHtml(`${option.fanCount} cellule${option.fanCount > 1 ? "s" : ""} active${option.fanCount > 1 ? "s" : ""} • ${option.mountMode.label}`)}</p>
+      </div>
+
+      ${renderReportMetricGrid([
+        ["Diametre reel retenu", formatMeters(option.diameter)],
+        ["Cellules actives", `${option.fanCount} / ${option.totalCells}`],
+        ["FCC reel", formatFactor(option.coverageFactor)],
+        ["Hauteur sous pales", formatMeters(option.bladeHeight)],
+        ["Surface cible", formatSquareMeters(option.targetArea)],
+        ["Debordement", formatSquareMeters(option.spillArea)]
+      ])}
+
+      <div class="report-plan-block">
+        <div class="report-plan">${svgForVariabilityDesign(option)}</div>
+        <div class="report-side">
+          ${renderReportTable(
+            ["Lecture", "Valeur"],
+            [
+              ["Montage", option.mountMode.label],
+              ["Cellule", `${formatMeters(option.cellLength)} × ${formatMeters(option.cellWidth)}`],
+              ["Diametre theorique max", formatMeters(option.theoreticalMaxDiameter)],
+              ["Mur limitant", `${formatMeters(option.wallClearance)} > ${formatMeters(option.diameter)}`],
+              [
+                "Entraxe mini",
+                option.interFanSpacing
+                  ? `${formatMeters(option.interFanSpacing)} > 2,5 × D`
+                  : "Non applicable"
+              ],
+              ["Diametres admissibles", formatDiameterCmList(option.compatibleRealDiameters)]
+            ],
+            true
+          )}
+          ${renderReportWarningList(getVariabilityWarnings(option))}
+        </div>
+      </div>
+
+      ${renderVariabilityZoneSummary(option)}
+      ${renderModelHighlights(option, brasse2Models)}
+    </section>
+  `;
+}
+
+function renderReportFirstPage(state, selectedOptions, brasse2Models) {
+  return `
+    <section class="report-page report-first-page">
+      <header class="report-cover">
+        <p class="report-cover-kicker">Rapport de simulation • le ${escapeHtml(
+          formatDateTime(state.generatedAt)
+        )}</p>
+        <h1>${escapeHtml(state.simulationName)}</h1>
+        <p class="report-cover-lead">
+          Synthese de la piece etudiee et des options selectionnees pour l'export PDF.
+        </p>
+      </header>
+
+      ${renderStudySummarySection(state, selectedOptions, brasse2Models)}
+      ${state.kind === "variability-ok" ? renderZonesSummaryTable(state.zones) : ""}
+      ${renderSelectedOptionsOverview(state, selectedOptions)}
+    </section>
+  `;
+}
+
+function renderEmptyOrInvalidReport(state) {
+  const roomBlock =
+    state.room && Number.isFinite(state.room.length)
+      ? renderReportSummaryCards([
+          [
+            "Piece",
+            `${formatMeters(state.room.length)} × ${formatMeters(state.room.width)}`,
+            `${formatSquareMeters(state.room.length * state.room.width)} - HSP ${formatMeters(
+              state.room.height
+            )}`
+          ]
+        ])
+      : "";
+
+  let title = "Calcul impossible";
+  let text =
+    "Les donnees saisies ne permettent pas de produire un rapport de calepinage exploitable.";
+
+  if (state.kind === "uniformity-empty") {
+    title = "Aucune solution compatible";
+    text =
+      "Aucun cas standard ou low-profile n'a pu etre valide avec les regles BRASSE de FCC, de distances et de hauteur.";
+  } else if (state.kind === "variability-empty") {
+    title = "Aucune trame valide";
+    text =
+      "Le moteur n'a pas trouve de trame reguliere conforme aux regles BRASSE pour couvrir les zones cibles saisies.";
+  }
+
+  return `
+    <section class="report-page report-first-page">
+      <header class="report-cover">
+        <p class="report-cover-kicker">Rapport de simulation • le ${escapeHtml(
+          formatDateTime(state.generatedAt)
+        )}</p>
+        <h1>${escapeHtml(state.simulationName)}</h1>
+      </header>
+      ${roomBlock}
+      <section class="report-block">
+        <h2>Conclusion</h2>
+        <div class="report-note report-note-warning">
+          <strong>${escapeHtml(title)}</strong>
+          <p>${escapeHtml(text)}</p>
+        </div>
+        ${
+          state.issues?.length
+            ? `
+              <div class="report-note" style="margin-top: 10px;">
+                <strong>Points releves</strong>
+                <ul>
+                  ${state.issues.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
+                </ul>
+              </div>
+            `
+            : ""
+        }
+      </section>
+    </section>
+  `;
 }
 
 export function buildPdfReportStyles() {
   return `
-    @page { size: A4; margin: 14mm; }
+    @page { size: A4; margin: 12mm; }
     * { box-sizing: border-box; }
     body {
       margin: 0;
-      font-family: Inter, "Segoe UI", Arial, sans-serif;
-      color: #111827;
+      font-family: "Segoe UI", Arial, sans-serif;
+      color: #17212b;
       background: #ffffff;
       line-height: 1.45;
     }
-    .report-root { max-width: 190mm; margin: 0 auto; }
+    .report-root {
+      max-width: 186mm;
+      margin: 0 auto;
+    }
+    .report-page + .report-page {
+      break-before: page;
+      page-break-before: always;
+    }
     .report-cover {
       display: grid;
-      gap: 14px;
-      padding-bottom: 14px;
-      border-bottom: 2px solid #d6d9df;
-      margin-bottom: 18px;
+      gap: 8px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #d6d9df;
+      margin-bottom: 16px;
     }
-    .report-cover-kicker {
+    .report-cover-kicker,
+    .report-section-kicker {
       margin: 0;
       color: #6b7280;
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 700;
-      letter-spacing: 0.12em;
+      letter-spacing: 0.1em;
       text-transform: uppercase;
     }
-    .report-cover h1 {
+    .report-cover h1,
+    .report-section-head h2 {
       margin: 0;
-      font-size: 24px;
+      font-size: 22px;
       line-height: 1.15;
     }
-    .report-cover p {
+    .report-cover-lead {
       margin: 0;
       color: #4b5563;
-      font-size: 13px;
+      font-size: 12px;
     }
-    .report-meta-grid,
+    .report-section-head p {
+      margin: 4px 0 0;
+      color: #4b5563;
+      font-size: 12px;
+    }
+    .report-summary-grid,
     .report-metrics {
       display: grid;
       gap: 10px;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
-    .report-meta-item,
+    .report-summary-card,
     .report-metric {
       border: 1px solid #d6d9df;
       border-radius: 10px;
       padding: 10px 12px;
-      background: #f9fafb;
+      background: #f8fafc;
     }
-    .report-meta-item strong,
+    .report-summary-card strong,
     .report-metric strong {
       display: block;
       margin-bottom: 4px;
@@ -302,49 +573,48 @@ export function buildPdfReportStyles() {
       letter-spacing: 0.08em;
       text-transform: uppercase;
     }
-    .report-meta-item span,
+    .report-summary-card span,
     .report-metric span {
       display: block;
       font-size: 13px;
-      font-weight: 600;
+      font-weight: 700;
+      color: #111827;
+    }
+    .report-summary-card small {
+      display: block;
+      margin-top: 4px;
+      color: #4b5563;
+      font-size: 11px;
+      line-height: 1.4;
     }
     .report-block,
-    .report-option,
     .report-section,
-    .report-note {
+    .report-note,
+    .report-plan-block {
       break-inside: avoid;
       page-break-inside: avoid;
     }
-    .report-block {
-      margin-bottom: 18px;
-    }
-    .report-block h2 {
-      margin: 0 0 10px;
-      font-size: 17px;
-    }
-    .report-block > p {
-      margin: 0;
-      color: #4b5563;
-      font-size: 12px;
-    }
-    .report-option {
+    .report-block + .report-block,
+    .report-section + .report-section {
       margin-top: 16px;
-      padding-top: 16px;
-      border-top: 1px solid #d6d9df;
     }
-    .report-option-head h3 {
-      margin: 0;
-      font-size: 16px;
+    .report-block h2,
+    .report-section h3 {
+      margin: 0 0 10px;
+      font-size: 15px;
+      line-height: 1.25;
     }
-    .report-option-head p {
-      margin: 4px 0 0;
-      color: #4b5563;
-      font-size: 12px;
+    .report-section-head {
+      display: grid;
+      gap: 2px;
+      margin-bottom: 12px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #d6d9df;
     }
     .report-plan-block {
       display: grid;
       gap: 14px;
-      grid-template-columns: minmax(0, 1.3fr) minmax(0, 0.9fr);
+      grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.95fr);
       align-items: start;
       margin-top: 12px;
     }
@@ -352,7 +622,7 @@ export function buildPdfReportStyles() {
       border: 1px solid #d6d9df;
       border-radius: 10px;
       padding: 10px;
-      background: #f9fafb;
+      background: #f8fafc;
     }
     .report-plan svg {
       width: 100%;
@@ -370,13 +640,13 @@ export function buildPdfReportStyles() {
     }
     .report-table th,
     .report-table td {
-      padding: 8px 10px;
+      padding: 8px 9px;
       border: 1px solid #d6d9df;
       vertical-align: top;
       text-align: left;
     }
     .report-table th {
-      background: #f9fafb;
+      background: #f8fafc;
       color: #374151;
       font-weight: 700;
     }
@@ -389,7 +659,7 @@ export function buildPdfReportStyles() {
       border: 1px solid #d6d9df;
       border-radius: 10px;
       padding: 10px 12px;
-      background: #f9fafb;
+      background: #f8fafc;
     }
     .report-note-warning {
       background: #fff6e5;
@@ -410,8 +680,8 @@ export function buildPdfReportStyles() {
       padding-left: 16px;
     }
     .report-footer {
-      margin-top: 20px;
-      padding-top: 12px;
+      margin-top: 18px;
+      padding-top: 10px;
       border-top: 1px solid #d6d9df;
       color: #4b5563;
       font-size: 10.5px;
@@ -421,7 +691,9 @@ export function buildPdfReportStyles() {
       text-decoration: none;
     }
     @media print {
-      .report-root { max-width: none; }
+      .report-root {
+        max-width: none;
+      }
     }
   `;
 }
@@ -446,103 +718,25 @@ export function buildPdfReportDocument(state, brasse2Models) {
     return "";
   }
 
-  const metaItems = [["Simulation", state.simulationName]];
+  const selectedOptions = getSelectedReportOptions(state);
   let bodyContent = "";
 
   if (state.kind === "uniformity-ok") {
-    const best = state.candidates[0];
     bodyContent = `
-      <section class="report-block">
-        <h2>Synthese</h2>
-        ${renderReportMetricGrid([
-          ["Option recommandee", `${best.nx} × ${best.ny}`],
-          ["Brasseurs", `${best.fanCount}`],
-          ["Diametre retenu", formatMeters(best.diameter)],
-          ["FCC reel", formatFactor(best.coverageFactor)],
-          ["Montage", best.mountMode.label],
-          ["Modeles BRASSE II", `${getReportModelHighlights(best, brasse2Models).length}`]
-        ])}
-      </section>
-
-      <section class="report-block">
-        <h2>Options classees</h2>
-        ${renderUniformityReportOptions(state.candidates, brasse2Models)}
-      </section>
-    `;
-  } else if (state.kind === "uniformity-empty") {
-    bodyContent = `
-      <section class="report-block">
-        <h2>Conclusion</h2>
-        <div class="report-note report-note-warning">
-          <strong>Aucune solution compatible</strong>
-          <p>Aucun cas standard ou low-profile n'a pu etre valide avec les regles BRASSE de FCC, de distances et de hauteur.</p>
-        </div>
-        ${state.fallbackFlush ? `
-          <div class="report-note" style="margin-top:10px;">
-            <strong>Piste flush</strong>
-            <p>Un montage flush pourrait rouvrir une piste jusqu'a ${escapeHtml(formatMeters(state.fallbackFlush.diameter))}, avec la forte penalite de performance indiquee par le guide.</p>
-          </div>
-        ` : ""}
-        ${state.issues?.length ? `
-          <div class="report-note" style="margin-top:10px;">
-            <strong>Motifs releves</strong>
-            <ul>
-              ${state.issues.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
-            </ul>
-          </div>
-        ` : ""}
-      </section>
+      ${renderReportFirstPage(state, selectedOptions, brasse2Models)}
+      ${selectedOptions
+        .map((option) => renderUniformityOptionPage(state, option, brasse2Models))
+        .join("")}
     `;
   } else if (state.kind === "variability-ok") {
-    const best = state.designs[0];
     bodyContent = `
-      <section class="report-block">
-        <h2>Synthese</h2>
-        ${renderReportMetricGrid([
-          ["Option recommandee", `${best.nx} × ${best.ny}`],
-          ["Brasseurs actifs", `${best.fanCount}`],
-          ["Diametre retenu", formatMeters(best.diameter)],
-          ["Debordement", formatSquareMeters(best.spillArea)],
-          ["Surface cible", formatSquareMeters(best.targetArea)],
-          ["Montage", best.mountMode.label]
-        ])}
-      </section>
-
-      <section class="report-block">
-        <h2>Options classees</h2>
-        ${renderVariabilityReportOptions(state.designs, brasse2Models)}
-      </section>
+      ${renderReportFirstPage(state, selectedOptions, brasse2Models)}
+      ${selectedOptions
+        .map((option) => renderVariabilityOptionPage(state, option, brasse2Models))
+        .join("")}
     `;
-  } else if (state.kind === "variability-empty") {
-    bodyContent = `
-      <section class="report-block">
-        <h2>Conclusion</h2>
-        <div class="report-note report-note-warning">
-          <strong>Aucune trame valide</strong>
-          <p>Le moteur n'a pas trouve de trame reguliere conforme aux regles BRASSE pour couvrir les rectangles cibles saisis.</p>
-        </div>
-        ${state.issues?.length ? `
-          <div class="report-note" style="margin-top:10px;">
-            <strong>Motifs releves</strong>
-            <ul>
-              ${state.issues.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
-            </ul>
-          </div>
-        ` : ""}
-      </section>
-    `;
-  } else if (state.kind === "invalid") {
-    bodyContent = `
-      <section class="report-block">
-        <h2>Calcul impossible</h2>
-        <div class="report-note report-note-warning">
-          <strong>Donnees invalides</strong>
-          <ul>
-            ${state.issues.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
-          </ul>
-        </div>
-      </section>
-    `;
+  } else {
+    bodyContent = renderEmptyOrInvalidReport(state);
   }
 
   return `
@@ -556,25 +750,6 @@ export function buildPdfReportDocument(state, brasse2Models) {
     </head>
     <body>
       <main class="report-root">
-        <header class="report-cover">
-          <p class="report-cover-kicker">Rapport BRASSE • le ${escapeHtml(formatDateTime(state.generatedAt))}</p>
-          <h1>${escapeHtml(state.simulationName)}</h1>
-          <p>${escapeHtml([state.context, state.modesLabel].filter(Boolean).join(" • "))}</p>
-          ${metaItems.length > 0 ? `
-            <div class="report-meta-grid">
-              ${metaItems
-                .map(
-                  ([label, value]) => `
-                    <article class="report-meta-item">
-                      <strong>${escapeHtml(label)}</strong>
-                      <span>${escapeHtml(value)}</span>
-                    </article>
-                  `
-                )
-                .join("")}
-            </div>
-          ` : ""}
-        </header>
         ${bodyContent}
         <footer class="report-footer">
           Fait par Nathan Château, <a href="mailto:chateaunathan@proton.me">chateaunathan@proton.me</a>

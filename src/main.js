@@ -2,13 +2,16 @@ import { BRASSE2_MODELS } from "../data/brasse2-data.js";
 import { getDomRefs } from "./app/dom.js";
 import {
   createAppState,
+  createSelectedReportOptionKeys,
   createDefaultZoneDraft,
   ensureVariabilityZones,
   getCurrentRoomDraft,
+  getSelectedReportOptions,
   normalizeAllZoneDrafts,
   removeZoneDraft,
   resetState,
   setLatestReportState,
+  toggleLatestReportOptionSelection,
   updateZoneDraft
 } from "./app/state.js";
 import { MAX_GRID_FANS, MOUNT_MODES } from "./core/constants.js";
@@ -36,7 +39,11 @@ import {
   renderVariabilityStatusNote,
   renderVariabilitySummary
 } from "./ui/results.js";
-import { refreshReportHeader, setExportAvailability } from "./ui/reportHeader.js";
+import {
+  refreshReportHeader,
+  setExportAvailability,
+  setExportSelectionSummary
+} from "./ui/reportHeader.js";
 import { renderZonesEditor, syncZoneCard } from "./ui/zonesEditor.js";
 import { exportPdfReport } from "./report/pdf.js";
 
@@ -127,10 +134,47 @@ function validateInputs(values) {
   return issues;
 }
 
+function updateExportControls() {
+  const latestReportState = state.latestReportState;
+  if (!latestReportState) {
+    setExportAvailability(dom, false);
+    setExportSelectionSummary(dom, "");
+    return;
+  }
+
+  const selectedOptions = getSelectedReportOptions(latestReportState);
+  if (selectedOptions.length === 0) {
+    setExportAvailability(dom, latestReportState.kind !== "uniformity-ok" && latestReportState.kind !== "variability-ok");
+    setExportSelectionSummary(
+      dom,
+      latestReportState.kind === "uniformity-ok" || latestReportState.kind === "variability-ok"
+        ? "Aucune option selectionnee pour le PDF"
+        : ""
+    );
+    return;
+  }
+
+  const selectableCount =
+    latestReportState.kind === "uniformity-ok"
+      ? latestReportState.candidates.length
+      : latestReportState.kind === "variability-ok"
+        ? latestReportState.designs.length
+        : 0;
+
+  setExportAvailability(dom, true);
+  setExportSelectionSummary(
+    dom,
+    selectableCount > 0
+      ? `${selectedOptions.length} option${selectedOptions.length > 1 ? "s" : ""} selectionnee${selectedOptions.length > 1 ? "s" : ""} sur ${selectableCount}`
+      : ""
+  );
+}
+
 function resetResultsVisibility() {
   dom.emptyState.classList.add("hidden");
   dom.resultsContent.classList.add("hidden");
   setExportAvailability(dom, false);
+  setExportSelectionSummary(dom, "");
   setLatestReportState(state, null);
   resetResultsModelSections();
 }
@@ -284,7 +328,8 @@ function render() {
             simulationName: getSimulationName(),
             room,
             zones,
-            designs: designs.slice(0, 3),
+            designs: designs.slice(0, 5),
+            selectedOptionKeys: createSelectedReportOptionKeys(designs.slice(0, 5)),
             modesLabel: getSelectedModesLabel(modes),
             generatedAt,
             context: `Zones a couvrir • option recommandee : ${designs[0].fanCount} brasseur${designs[0].fanCount > 1 ? "s" : ""} sur ${designs[0].nx} × ${designs[0].ny}`
@@ -306,8 +351,14 @@ function render() {
     );
     renderVariabilitySummary(dom, room, zones, designs, brasse2Models);
     renderVariabilityStatusNote(dom, room, zones, designs, modes, realDiameters);
-    renderVariabilityResults(dom, designs, brasse2Models, realDiameters);
-    setExportAvailability(dom, true);
+    renderVariabilityResults(
+      dom,
+      designs,
+      brasse2Models,
+      realDiameters,
+      state.latestReportState?.selectedOptionKeys || []
+    );
+    updateExportControls();
     dom.resultsContent.classList.remove("hidden");
     return;
   }
@@ -337,15 +388,22 @@ function render() {
     strategy: rawValues.strategy,
     simulationName: getSimulationName(),
     room,
-    candidates: candidates.slice(0, 3),
+    candidates: candidates.slice(0, 5),
+    selectedOptionKeys: createSelectedReportOptionKeys(candidates.slice(0, 5)),
     modesLabel: getSelectedModesLabel(modes),
     generatedAt,
     context: `Recherche d'uniformite • option recommandee : ${candidates[0].nx} × ${candidates[0].ny}`
   });
   renderSummary(dom, room, candidates, brasse2Models);
   renderStatusNote(dom, room, candidates, fallbackFlush, modes, realDiameters);
-  renderResults(dom, candidates, brasse2Models, realDiameters);
-  setExportAvailability(dom, true);
+  renderResults(
+    dom,
+    candidates,
+    brasse2Models,
+    realDiameters,
+    state.latestReportState?.selectedOptionKeys || []
+  );
+  updateExportControls();
   dom.resultsContent.classList.remove("hidden");
 }
 
@@ -468,6 +526,16 @@ dom.zonesList.addEventListener("click", (event) => {
   }
 });
 
+dom.resultsList.addEventListener("change", (event) => {
+  const target = event.target;
+  if (!target?.matches?.("[data-export-option-key]")) {
+    return;
+  }
+
+  toggleLatestReportOptionSelection(state, target.dataset.exportOptionKey, target.checked);
+  updateExportControls();
+});
+
 [dom.lengthInput, dom.widthInput].forEach((input) => {
   input.addEventListener("change", () => {
     if (dom.strategyInput.value !== "variabilite") {
@@ -490,6 +558,7 @@ updateHeader({
   room: getRoomInputs()
 });
 setExportAvailability(dom, false);
+setExportSelectionSummary(dom, "");
 bindResultsInteractions(dom);
 initializeCatalogFilters(dom, brasse2Models);
 renderCatalog(dom, brasse2Models);

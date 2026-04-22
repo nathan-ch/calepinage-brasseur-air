@@ -16,8 +16,7 @@ import {
   enumerateCandidates,
   getFallbackFlushCandidate
 } from "./core/calepinage.js";
-import { assessOptionCeilingCompatibility } from "./core/ceilingAssessment.js";
-import { buildCeilingGrid } from "./core/ceilingGrid.js";
+import { buildCeilingAwareDisplayCandidates } from "./core/ceilingAdaptive.js";
 import { parseNumber, formatMeters } from "./core/formatters.js";
 import { buildHeightDiameterRequirementMessage } from "./core/messages.js";
 import {
@@ -84,28 +83,6 @@ function getRoomInputs() {
 function renderCeilingPanel() {
   dom.ceilingEnabledInput.checked = state.ceilingLayout.enabled;
   return renderCeilingEditor(dom, state, getRoomInputs());
-}
-
-function getActiveCeilingGrid(room) {
-  if (!state.ceilingLayout.enabled) {
-    return null;
-  }
-
-  return buildCeilingGrid(room, state.ceilingLayout);
-}
-
-function attachCeilingAssessments(items, room) {
-  const ceilingGrid = getActiveCeilingGrid(room);
-
-  if (!ceilingGrid) {
-    return items;
-  }
-
-  return items.map((item) => ({
-    ...item,
-    ceilingGrid,
-    ceilingAssessment: assessOptionCeilingCompatibility(item, ceilingGrid)
-  }));
 }
 
 function updateHeader({ room, recommendation = "", generatedAt = new Date() }) {
@@ -235,7 +212,7 @@ function renderUniformityEmpty(room, fallbackFlush, generatedAt) {
 }
 
 function render() {
-  renderCeilingPanel();
+  const ceilingGrid = renderCeilingPanel();
 
   const rawValues = getRoomInputs();
   const issues = validateInputs(rawValues);
@@ -254,17 +231,30 @@ function render() {
     height: rawValues.height
   };
   const modes = getSelectedModes();
-  const candidates = attachCeilingAssessments(
-    enumerateCandidates(room, MAX_GRID_FANS, modes, realDiameters),
-    room
-  );
+  const strictCandidates = enumerateCandidates(room, MAX_GRID_FANS, modes, realDiameters);
   const fallbackFlush =
-    candidates.length === 0 ? getFallbackFlushCandidate(room, MAX_GRID_FANS, realDiameters) : null;
+    strictCandidates.length === 0
+      ? getFallbackFlushCandidate(room, MAX_GRID_FANS, realDiameters)
+      : null;
 
-  if (candidates.length === 0) {
+  if (strictCandidates.length === 0) {
     renderUniformityEmpty(room, fallbackFlush, generatedAt);
     return;
   }
+
+  const candidates = ceilingGrid
+    ? buildCeilingAwareDisplayCandidates(
+        strictCandidates,
+        room,
+        modes,
+        realDiameters,
+        ceilingGrid,
+        MAX_GRID_FANS
+      )
+    : strictCandidates.slice(0, 5).map((candidate) => ({
+        ...candidate,
+        placementMode: "strict"
+      }));
 
   updateHeader({
     room,
@@ -275,13 +265,13 @@ function render() {
     kind: "uniformity-ok",
     simulationName: getSimulationName(),
     room,
-    candidates: candidates.slice(0, 5),
-    selectedOptionKeys: createSelectedReportOptionKeys(candidates.slice(0, 5)),
+    candidates,
+    selectedOptionKeys: createSelectedReportOptionKeys(candidates),
     modesLabel: getSelectedModesLabel(modes),
     generatedAt,
     context: `Recherche d'uniformite • option recommandee : ${candidates[0].nx} × ${candidates[0].ny}`
   });
-  renderSummary(dom, room, candidates, brasse2Models);
+  renderSummary(dom, room, candidates, brasse2Models, strictCandidates.length);
   renderStatusNote(dom, room, candidates, fallbackFlush, modes, realDiameters);
   renderResults(
     dom,

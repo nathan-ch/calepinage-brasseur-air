@@ -889,6 +889,726 @@ function assessOptionCeilingCompatibility(option, ceilingGrid) {
   );
 }
 
+// src/core/ceilingAdaptive.js
+const TILE_SAMPLE_FRACTIONS = [0.15, 0.35, 0.5, 0.65, 0.85];
+const AXIS_SLOT_CANDIDATES = 9;
+const AXIS_BEAM_WIDTH = 60;
+const AXIS_LAYOUT_LIMIT = 18;
+const DISPLAY_LIMIT = 5;
+
+function ceilingValueKey(value) {
+  return value.toFixed(6);
+}
+
+function getCandidateSignature(candidate) {
+  return `${candidate.nx}x${candidate.ny}-${candidate.mountMode.id}-${Math.round(candidate.diameter * 100)}`;
+}
+
+function getFanClassForDiameter(diameter) {
+  return diameter >= SMALL_FAN_LIMIT - EPS ? "large" : "small";
+}
+
+function isDiameterHeightCompatible(room, mountMode, diameter) {
+  const mountDistance = mountMode.factor * diameter;
+  const bladeHeight = room.height - mountDistance;
+  const fanClass = getFanClassForDiameter(diameter);
+
+  if (fanClass === "small") {
+    return bladeHeight >= SMALL_SAFETY_HEIGHT - EPS && bladeHeight <= 2 * diameter + EPS;
+  }
+
+  return (
+    bladeHeight >= LARGE_SAFETY_HEIGHT - EPS &&
+    bladeHeight >= 0.8 * diameter - EPS &&
+    bladeHeight <= 2 * diameter + EPS
+  );
+}
+
+function getUniformTemplateMetrics(room, nx, ny, mountMode) {
+  const cellLength = room.length / nx;
+  const cellWidth = room.width / ny;
+  const cellArea = cellLength * cellWidth;
+  const cellShort = Math.min(cellLength, cellWidth);
+  const cellLong = Math.max(cellLength, cellWidth);
+  const formFactor = cellLong / cellShort;
+  const coverageMinDiameter = 0.2 * Math.sqrt(cellArea);
+  const coverageMaxDiameter = 0.4 * Math.sqrt(cellArea);
+  const wallMaxDiameter = cellShort / 2;
+  const spacingCaps = [];
+
+  if (nx > 1) {
+    spacingCaps.push(cellLength / 2.5);
+  }
+  if (ny > 1) {
+    spacingCaps.push(cellWidth / 2.5);
+  }
+
+  const interFanMaxDiameter =
+    spacingCaps.length > 0 ? Math.min(...spacingCaps) : Number.POSITIVE_INFINITY;
+  const dGeoMax = Math.min(coverageMaxDiameter, wallMaxDiameter, interFanMaxDiameter);
+  const intervals =
+    dGeoMax > coverageMinDiameter + EPS
+      ? buildHeightFeasibility(room.height, mountMode.factor, coverageMinDiameter, dGeoMax)
+      : [];
+  const theoreticalMaxDiameter = intervals.reduce(
+    (best, interval) => Math.max(best, interval.upper),
+    0
+  );
+
+  return {
+    cellLength,
+    cellWidth,
+    cellArea,
+    cellShort,
+    cellLong,
+    formFactor,
+    coverageMinDiameter,
+    coverageMaxDiameter,
+    wallMaxDiameter,
+    interFanMaxDiameter,
+    theoreticalMaxDiameter: theoreticalMaxDiameter > EPS ? theoreticalMaxDiameter : null
+  };
+}
+
+function isAxisPackingFeasible(length, count, diameter) {
+  if (count === 1) {
+    return length > diameter * 2 + EPS;
+  }
+
+  const minimumSpan = diameter * 2 + (count - 1) * 2.5 * diameter;
+  return length > minimumSpan + EPS;
+}
+
+function buildAxisSamples(axis, length, diameter) {
+  const seen = new Set();
+  const samples = [];
+
+  axis.tiles.forEach((tile) => {
+    TILE_SAMPLE_FRACTIONS.forEach((fraction) => {
+      const value = tile.min + tile.size * fraction;
+      if (value <= diameter + EPS || value >= length - diameter - EPS) {
+        return;
+      }
+
+      const key = `${tile.index}:${ceilingValueKey(value)}`;
+      if (seen.has(key)) {
+        return;
+      }
+
+      seen.add(key);
+      samples.push({
+        value: Number(value.toFixed(6)),
+        tileIndex: tile.index,
+        tileKey: tile.key,
+        tileIsCut: tile.isCut
+      });
+    });
+  });
+
+  return samples.sort((a, b) => a.value - b.value);
+}
+
+function buildIdealAxisPositions(length, count) {
+  return Array.from({ length: count }, (_, index) => ((index + 0.5) * length) / count);
+}
+
+function buildAxisSlotCandidates(samples, idealPositions) {
+  return idealPositions.map((ideal) =>
+    [...samples]
+      .sort((a, b) => {
+        const distanceDelta = Math.abs(a.value - ideal) - Math.abs(b.value - ideal);
+        if (Math.abs(distanceDelta) > EPS) {
+          return distanceDelta;
+        }
+        return a.value - b.value;
+      })
+      .slice(0, AXIS_SLOT_CANDIDATES)
+  );
+}
+
+function buildAxisBoundaries(length, positions) {
+  const boundaries = [0];
+
+  for (let index = 0; index < positions.length - 1; index += 1) {
+    boundaries.push((positions[index] + positions[index + 1]) / 2);
+  }
+
+  boundaries.push(length);
+  return boundaries.map((value) => Number(value.toFixed(6)));
+}
+
+function getAxisCellSpans(boundaries) {
+  const spans = [];
+
+  for (let index = 0; index < boundaries.length - 1; index += 1) {
+    spans.push(Number((boundaries[index + 1] - boundaries[index]).toFixed(6)));
+  }
+
+  return spans;
+}
+
+function getAxisSymmetryScore(length, positions, idealPositions) {
+  const centeredPenalty = positions.reduce((sum, position, index) => {
+    const mirrorIndex = positions.length - 1 - index;
+    if (index > mirrorIndex) {
+      return sum;
+    }
+    if (index === mirrorIndex) {
+      return sum + Math.abs(position - length / 2) / length;
+    }
+    return sum + Math.abs(position + positions[mirrorIndex] - length) / length;
+  }, 0);
+
+  const idealPenalty = positions.reduce(
+    (sum, position, index) => sum + Math.abs(position - idealPositions[index]) / length,
+    0
+  );
+
+  const idealGap = length / positions.length;
+  const gapPenalty =
+    positions.length > 1
+      ? positions.slice(1).reduce((sum, position, index) => {
+          const gap = position - positions[index];
+          return sum + Math.abs(gap - idealGap) / length;
+        }, 0)
+      : 0;
+
+  return Number((centeredPenalty * 2 + idealPenalty + gapPenalty).toFixed(6));
+}
+
+function buildAxisLayouts(axis, length, count, diameter) {
+  if (count <= 0) {
+    return [];
+  }
+
+  const samples = buildAxisSamples(axis, length, diameter);
+  if (samples.length < count) {
+    return [];
+  }
+
+  const idealPositions = buildIdealAxisPositions(length, count);
+  const slotCandidates = buildAxisSlotCandidates(samples, idealPositions);
+  const minSpacing = count > 1 ? 2.5 * diameter : 0;
+  let beam = [{ picks: [], roughScore: 0 }];
+
+  for (let slotIndex = 0; slotIndex < count; slotIndex += 1) {
+    const nextBeam = [];
+    const remainingCount = count - slotIndex - 1;
+
+    beam.forEach((partial) => {
+      slotCandidates[slotIndex].forEach((candidate) => {
+        const previous = partial.picks[partial.picks.length - 1];
+
+        if (previous && candidate.value <= previous.value + minSpacing - EPS) {
+          return;
+        }
+
+        const maxAllowed = length - diameter - remainingCount * minSpacing;
+        if (candidate.value > maxAllowed + EPS) {
+          return;
+        }
+
+        const nextPicks = [...partial.picks, candidate];
+        const roughScore =
+          partial.roughScore + Math.abs(candidate.value - idealPositions[slotIndex]) / length;
+
+        nextBeam.push({
+          picks: nextPicks,
+          roughScore
+        });
+      });
+    });
+
+    const deduped = new Map();
+    nextBeam
+      .sort((a, b) => a.roughScore - b.roughScore)
+      .forEach((state) => {
+        const key = state.picks.map((pick) => ceilingValueKey(pick.value)).join("|");
+        if (!deduped.has(key)) {
+          deduped.set(key, state);
+        }
+      });
+
+    beam = [...deduped.values()].slice(0, AXIS_BEAM_WIDTH);
+    if (beam.length === 0) {
+      return [];
+    }
+  }
+
+  return beam
+    .map((state) => {
+      const positions = state.picks.map((pick) => pick.value);
+      const boundaries = buildAxisBoundaries(length, positions);
+      const spans = getAxisCellSpans(boundaries);
+      const minClearance = Math.min(positions[0], length - positions[positions.length - 1]);
+      const minSpacingValue =
+        positions.length > 1
+          ? positions.slice(1).reduce(
+              (best, position, index) => Math.min(best, position - positions[index]),
+              Number.POSITIVE_INFINITY
+            )
+          : null;
+
+      return {
+        positions,
+        picks: state.picks,
+        boundaries,
+        spans,
+        minClearance,
+        minSpacing: minSpacingValue,
+        symmetryScore: getAxisSymmetryScore(length, positions, idealPositions)
+      };
+    })
+    .sort((a, b) => a.symmetryScore - b.symmetryScore)
+    .slice(0, AXIS_LAYOUT_LIMIT);
+}
+
+function getMinimumSpacingPair(coordinates) {
+  if (coordinates.length < 2) {
+    return null;
+  }
+
+  let bestPair = null;
+  let bestDistance = Number.POSITIVE_INFINITY;
+
+  for (let firstIndex = 0; firstIndex < coordinates.length; firstIndex += 1) {
+    for (let secondIndex = firstIndex + 1; secondIndex < coordinates.length; secondIndex += 1) {
+      const distance = Math.hypot(
+        coordinates[firstIndex].x - coordinates[secondIndex].x,
+        coordinates[firstIndex].y - coordinates[secondIndex].y
+      );
+
+      if (distance + EPS < bestDistance) {
+        bestDistance = distance;
+        bestPair = [firstIndex, secondIndex];
+      }
+    }
+  }
+
+  return bestPair;
+}
+
+function getMinimumWallPointIndex(room, coordinates) {
+  let bestIndex = 0;
+  let bestClearance = Number.POSITIVE_INFINITY;
+
+  coordinates.forEach((point, index) => {
+    const clearance = Math.min(point.x, room.length - point.x, point.y, room.width - point.y);
+    if (clearance + EPS < bestClearance) {
+      bestClearance = clearance;
+      bestIndex = index;
+    }
+  });
+
+  return bestIndex;
+}
+
+function evaluateAdaptedCombination(room, ceilingGrid, nx, ny, diameter, xLayout, yLayout) {
+  const fanClass = getFanClassForDiameter(diameter);
+  const coordinates = [];
+  const adaptedCells = [];
+  let fccMin = Number.POSITIVE_INFINITY;
+  let fccMax = Number.NEGATIVE_INFINITY;
+  let ffMin = Number.POSITIVE_INFINITY;
+  let ffMax = Number.NEGATIVE_INFINITY;
+  let luminaireConflict = false;
+
+  for (let xIndex = 0; xIndex < nx; xIndex += 1) {
+    for (let yIndex = 0; yIndex < ny; yIndex += 1) {
+      const tileKey = `${xLayout.picks[xIndex].tileIndex}:${yLayout.picks[yIndex].tileIndex}`;
+      if (ceilingGrid.tileMap.get(tileKey)?.hasLuminaire) {
+        luminaireConflict = true;
+        break;
+      }
+
+      const point = {
+        x: xLayout.positions[xIndex],
+        y: yLayout.positions[yIndex]
+      };
+      const width = xLayout.spans[xIndex];
+      const height = yLayout.spans[yIndex];
+      const area = width * height;
+      const coverageFactor = getCoverageFactorForDiameter(area, diameter);
+      const formFactor = Math.max(width, height) / Math.min(width, height);
+
+      if (!isCoverageFactorValid(coverageFactor)) {
+        return null;
+      }
+
+      coordinates.push(point);
+      adaptedCells.push({
+        key: `${xIndex}:${yIndex}`,
+        minX: xLayout.boundaries[xIndex],
+        maxX: xLayout.boundaries[xIndex + 1],
+        minY: yLayout.boundaries[yIndex],
+        maxY: yLayout.boundaries[yIndex + 1],
+        width,
+        height,
+        coverageFactor,
+        formFactor
+      });
+
+      fccMin = Math.min(fccMin, coverageFactor);
+      fccMax = Math.max(fccMax, coverageFactor);
+      ffMin = Math.min(ffMin, formFactor);
+      ffMax = Math.max(ffMax, formFactor);
+    }
+
+    if (luminaireConflict) {
+      break;
+    }
+  }
+
+  if (luminaireConflict) {
+    return null;
+  }
+
+  const wallClearanceMin = coordinates.reduce((bestClearance, point) => {
+    const clearance = Math.min(point.x, room.length - point.x, point.y, room.width - point.y);
+    return Math.min(bestClearance, clearance);
+  }, Number.POSITIVE_INFINITY);
+
+  if (wallClearanceMin <= diameter + EPS) {
+    return null;
+  }
+
+  const xSpacing = xLayout.minSpacing ?? Number.POSITIVE_INFINITY;
+  const ySpacing = yLayout.minSpacing ?? Number.POSITIVE_INFINITY;
+  const interFanSpacingMin = Math.min(xSpacing, ySpacing);
+
+  if (Number.isFinite(interFanSpacingMin) && interFanSpacingMin <= 2.5 * diameter + EPS) {
+    return null;
+  }
+
+  return {
+    nx,
+    ny,
+    fanCount: nx * ny,
+    diameter,
+    fanClass,
+    coordinates,
+    adaptedCells,
+    cellBoundariesX: xLayout.boundaries,
+    cellBoundariesY: yLayout.boundaries,
+    xPositions: xLayout.positions,
+    yPositions: yLayout.positions,
+    adaptedMetrics: {
+      fccMin: Number(fccMin.toFixed(6)),
+      fccMax: Number(fccMax.toFixed(6)),
+      ffMin: Number(ffMin.toFixed(6)),
+      ffMax: Number(ffMax.toFixed(6)),
+      wallClearanceMin: Number(wallClearanceMin.toFixed(6)),
+      interFanSpacingMin: Number.isFinite(interFanSpacingMin)
+        ? Number(interFanSpacingMin.toFixed(6))
+        : null,
+      symmetryScore: Number((xLayout.symmetryScore + yLayout.symmetryScore).toFixed(6))
+    },
+    minimumWallPointIndex: getMinimumWallPointIndex(room, coordinates),
+    minimumSpacingPairIndices: getMinimumSpacingPair(coordinates)
+  };
+}
+
+function compareAdaptedLayouts(a, b) {
+  if (Math.abs(a.adaptedMetrics.symmetryScore - b.adaptedMetrics.symmetryScore) > EPS) {
+    return a.adaptedMetrics.symmetryScore - b.adaptedMetrics.symmetryScore;
+  }
+
+  if (Math.abs(b.diameter - a.diameter) > EPS) {
+    return b.diameter - a.diameter;
+  }
+
+  if (Math.abs(a.adaptedMetrics.ffMax - b.adaptedMetrics.ffMax) > EPS) {
+    return a.adaptedMetrics.ffMax - b.adaptedMetrics.ffMax;
+  }
+
+  if (Math.abs(b.adaptedMetrics.fccMin - a.adaptedMetrics.fccMin) > EPS) {
+    return b.adaptedMetrics.fccMin - a.adaptedMetrics.fccMin;
+  }
+
+  if (a.fanCount !== b.fanCount) {
+    return a.fanCount - b.fanCount;
+  }
+
+  if (a.mountMode.id !== b.mountMode.id) {
+    return a.mountMode.id === "standard" ? -1 : 1;
+  }
+
+  return a.nx - b.nx || a.ny - b.ny;
+}
+
+function buildAdaptedVariantForTopology(room, ceilingGrid, nx, ny, mountMode, realDiameters) {
+  const templateMetrics = getUniformTemplateMetrics(room, nx, ny, mountMode);
+  const candidateDiameters = [...realDiameters]
+    .filter(
+      (diameter) =>
+        diameter >= templateMetrics.coverageMinDiameter - EPS &&
+        diameter <= templateMetrics.coverageMaxDiameter + EPS &&
+        isDiameterHeightCompatible(room, mountMode, diameter) &&
+        isAxisPackingFeasible(room.length, nx, diameter) &&
+        isAxisPackingFeasible(room.width, ny, diameter)
+    )
+    .sort((a, b) => b - a);
+
+  if (candidateDiameters.length === 0) {
+    return null;
+  }
+
+  const successfulLayouts = [];
+
+  candidateDiameters.forEach((diameter) => {
+    const xLayouts = buildAxisLayouts(ceilingGrid.xAxis, room.length, nx, diameter);
+    const yLayouts = buildAxisLayouts(ceilingGrid.yAxis, room.width, ny, diameter);
+
+    if (xLayouts.length === 0 || yLayouts.length === 0) {
+      return;
+    }
+
+    const layoutCandidates = [];
+
+    xLayouts.forEach((xLayout) => {
+      yLayouts.forEach((yLayout) => {
+        const combination = evaluateAdaptedCombination(
+          room,
+          ceilingGrid,
+          nx,
+          ny,
+          diameter,
+          xLayout,
+          yLayout
+        );
+
+        if (combination) {
+          layoutCandidates.push({
+            ...combination,
+            mountMode
+          });
+        }
+      });
+    });
+
+    if (layoutCandidates.length === 0) {
+      return;
+    }
+
+    layoutCandidates.sort(compareAdaptedLayouts);
+    successfulLayouts.push(layoutCandidates[0]);
+  });
+
+  if (successfulLayouts.length === 0) {
+    return null;
+  }
+
+  const selectedLayout = successfulLayouts[0];
+  const recommendedSmallHeight = 1.4 * selectedLayout.diameter;
+  const mountDistance = mountMode.factor * selectedLayout.diameter;
+  const bladeHeight = room.height - mountDistance;
+
+  return {
+    key: `adapted-${nx}x${ny}-${mountMode.id}-${Math.round(selectedLayout.diameter * 100)}`,
+    placementMode: "adapted-ceiling",
+    sourceStrictKey: null,
+    strictReference: null,
+    nx,
+    ny,
+    fanCount: nx * ny,
+    room,
+    mountMode,
+    cellLength: templateMetrics.cellLength,
+    cellWidth: templateMetrics.cellWidth,
+    cellArea: templateMetrics.cellArea,
+    cellShort: templateMetrics.cellShort,
+    cellLong: templateMetrics.cellLong,
+    formFactor: selectedLayout.adaptedMetrics.ffMax,
+    diameter: selectedLayout.diameter,
+    theoreticalMaxDiameter: templateMetrics.theoreticalMaxDiameter ?? selectedLayout.diameter,
+    coverageFactor: selectedLayout.adaptedMetrics.fccMin,
+    mountDistance,
+    bladeHeight,
+    recommendedSmallHeightMet:
+      selectedLayout.fanClass === "small"
+        ? bladeHeight >= recommendedSmallHeight - EPS
+        : true,
+    recommendedSmallHeight,
+    wallClearance: selectedLayout.adaptedMetrics.wallClearanceMin,
+    interFanSpacing: selectedLayout.adaptedMetrics.interFanSpacingMin,
+    geometryCaps: {
+      coverageMinDiameter: templateMetrics.coverageMinDiameter,
+      coverageMaxDiameter: templateMetrics.coverageMaxDiameter,
+      wallMaxDiameter: templateMetrics.wallMaxDiameter,
+      interFanMaxDiameter: templateMetrics.interFanMaxDiameter
+    },
+    compatibleRealDiameters: successfulLayouts
+      .map((layout) => ({
+        diameter: layout.diameter,
+        fanClass: layout.fanClass,
+        coverageFactor: layout.adaptedMetrics.fccMin,
+        coverageFactorMax: layout.adaptedMetrics.fccMax
+      }))
+      .sort((a, b) => a.diameter - b.diameter),
+    coordinates: selectedLayout.coordinates,
+    cellBoundariesX: selectedLayout.cellBoundariesX,
+    cellBoundariesY: selectedLayout.cellBoundariesY,
+    adaptedCells: selectedLayout.adaptedCells,
+    adaptedMetrics: selectedLayout.adaptedMetrics,
+    minimumWallPointIndex: selectedLayout.minimumWallPointIndex,
+    minimumSpacingPairIndices: selectedLayout.minimumSpacingPairIndices,
+    fanClass: selectedLayout.fanClass,
+    strictAdvice:
+      "Verifier la faisabilite chantier du support dans les dalles retenues et la proximite visuelle avec les luminaires.",
+    ceilingGrid,
+    ceilingAssessment: {
+      enabled: true,
+      compatible: true,
+      reasonCode: "adapted",
+      reasonText:
+        "La trame stricte n'etait pas compatible avec le faux plafond. Une variante adaptee a ete calculee avec des centres ajustes dans les dalles disponibles.",
+      dx: 0,
+      dy: 0,
+      luminaireConflict: false,
+      wallClearance: selectedLayout.adaptedMetrics.wallClearanceMin,
+      appliedCoordinates: selectedLayout.coordinates,
+      shiftApplied: false,
+      adjustmentMode: "individual-fit",
+      adjustmentLabel: "Ajustement individuel",
+      visualCheckNote: "Verifier visuellement la proximite luminaire / brasseur."
+    }
+  };
+}
+
+function buildAdaptedCandidatePool(room, ceilingGrid, modes, realDiameters, maxFans) {
+  const pool = [];
+
+  for (let nx = 1; nx <= maxFans; nx += 1) {
+    for (let ny = 1; ny <= maxFans; ny += 1) {
+      if (nx * ny > maxFans) {
+        continue;
+      }
+
+      modes.forEach((mountMode) => {
+        const candidate = buildAdaptedVariantForTopology(
+          room,
+          ceilingGrid,
+          nx,
+          ny,
+          mountMode,
+          realDiameters
+        );
+
+        if (candidate) {
+          pool.push(candidate);
+        }
+      });
+    }
+  }
+
+  return pool.sort(compareAdaptedLayouts);
+}
+
+function createStrictReference(candidate) {
+  return {
+    key: candidate.key,
+    nx: candidate.nx,
+    ny: candidate.ny,
+    mountModeId: candidate.mountMode.id,
+    mountLabel: candidate.mountMode.label,
+    label: `${candidate.nx} × ${candidate.ny} • ${candidate.mountMode.label}`,
+    cellLength: candidate.cellLength,
+    cellWidth: candidate.cellWidth,
+    coordinates: candidate.coordinates
+  };
+}
+
+function decorateStrictCandidate(candidate, ceilingGrid) {
+  return {
+    ...candidate,
+    placementMode: "strict",
+    ceilingGrid,
+    ceilingAssessment: assessOptionCeilingCompatibility(candidate, ceilingGrid)
+  };
+}
+
+function decorateAdaptedDisplayCandidate(candidate, strictReference, sourceStrictKey) {
+  return {
+    ...candidate,
+    sourceStrictKey,
+    strictReference
+  };
+}
+
+function isSameStrictTopology(adaptedCandidate, strictCandidate) {
+  return (
+    adaptedCandidate.nx === strictCandidate.nx &&
+    adaptedCandidate.ny === strictCandidate.ny &&
+    adaptedCandidate.mountMode.id === strictCandidate.mountMode.id
+  );
+}
+
+function buildCeilingAwareDisplayCandidates(
+  strictCandidates,
+  room,
+  modes,
+  realDiameters,
+  ceilingGrid,
+  maxFans
+) {
+  if (!ceilingGrid) {
+    return strictCandidates.slice(0, DISPLAY_LIMIT);
+  }
+
+  const displayCandidates = [];
+  const usedSignatures = new Set();
+  const usedAdaptedKeys = new Set();
+  let adaptedPool = null;
+
+  for (const strictCandidate of strictCandidates) {
+    if (displayCandidates.length >= DISPLAY_LIMIT) {
+      break;
+    }
+
+    const assessedStrict = decorateStrictCandidate(strictCandidate, ceilingGrid);
+    const strictSignature = getCandidateSignature(assessedStrict);
+    const strictReference = createStrictReference(assessedStrict);
+    const strictIsUsable =
+      assessedStrict.ceilingAssessment.compatible && !usedSignatures.has(strictSignature);
+
+    if (strictIsUsable) {
+      displayCandidates.push(assessedStrict);
+      usedSignatures.add(strictSignature);
+      continue;
+    }
+
+    if (!adaptedPool) {
+      adaptedPool = buildAdaptedCandidatePool(room, ceilingGrid, modes, realDiameters, maxFans);
+    }
+
+    const replacement = adaptedPool.find(
+      (candidate) =>
+        isSameStrictTopology(candidate, assessedStrict) &&
+        !usedAdaptedKeys.has(candidate.key) &&
+        !usedSignatures.has(getCandidateSignature(candidate))
+    );
+
+    if (replacement) {
+      const displayCandidate = decorateAdaptedDisplayCandidate(
+        replacement,
+        strictReference,
+        assessedStrict.key
+      );
+      displayCandidates.push(displayCandidate);
+      usedAdaptedKeys.add(replacement.key);
+      usedSignatures.add(getCandidateSignature(displayCandidate));
+      continue;
+    }
+
+    if (!usedSignatures.has(strictSignature)) {
+      displayCandidates.push(assessedStrict);
+      usedSignatures.add(strictSignature);
+    }
+  }
+
+  return displayCandidates;
+}
+
 // src/core/calepinage.js
 function getRealDiametersForIntervals(realDiameters, intervals) {
   return realDiameters
@@ -1469,6 +2189,20 @@ function renderCeilingOverlay(geometry, ceilingGrid) {
 function renderTheoreticalGhostCenters(geometry, item, displayCoordinates) {
   const assessment = item.ceilingAssessment;
 
+  if (item.placementMode === "adapted-ceiling" && item.strictReference) {
+    return item.strictReference.coordinates
+      .map((point, index) => {
+        const renderedPoint = geometry.projectPoint(point);
+        return `
+          <g>
+            <circle cx="${renderedPoint.x}" cy="${renderedPoint.y}" r="4.4" fill="rgba(107,114,128,0.18)" stroke="rgba(107,114,128,0.38)" stroke-dasharray="3 3" />
+            <text x="${renderedPoint.x}" y="${renderedPoint.y + 3.8}" text-anchor="middle" font-size="8.5" fill="rgba(55,65,81,0.72)" font-weight="700">${index + 1}</text>
+          </g>
+        `;
+      })
+      .join("");
+  }
+
   if (!assessment?.compatible || !assessment.shiftApplied) {
     return "";
   }
@@ -1495,28 +2229,72 @@ function renderTheoreticalGhostCenters(geometry, item, displayCoordinates) {
     .join("");
 }
 
-function renderUniformGrid(geometry, item) {
-  const displayCellLength = geometry.rotateForFit ? item.cellWidth : item.cellLength;
-  const displayCellHeight = geometry.rotateForFit ? item.cellLength : item.cellWidth;
-  const displayNx = geometry.rotateForFit ? item.ny : item.nx;
-  const displayNy = geometry.rotateForFit ? item.nx : item.ny;
+function renderGridLinesFromBoundaries(
+  geometry,
+  boundariesX,
+  boundariesY,
+  stroke = "rgba(29,47,44,0.18)",
+  dasharray = "6 5"
+) {
   const gridLines = [];
 
-  for (let index = 1; index < displayNx; index += 1) {
-    const x = geometry.roomX + index * displayCellLength * geometry.scale;
+  boundariesX.slice(1, -1).forEach((value) => {
+    const x = geometry.projectPoint({ x: value, y: 0 }).x;
     gridLines.push(
-      `<line x1="${x}" y1="${geometry.roomY}" x2="${x}" y2="${geometry.roomY + geometry.roomHeight}" stroke="rgba(29,47,44,0.18)" stroke-dasharray="6 5" />`
+      `<line x1="${x}" y1="${geometry.roomY}" x2="${x}" y2="${geometry.roomY + geometry.roomHeight}" stroke="${stroke}" stroke-dasharray="${dasharray}" />`
     );
-  }
+  });
 
-  for (let index = 1; index < displayNy; index += 1) {
-    const y = geometry.roomY + index * displayCellHeight * geometry.scale;
+  boundariesY.slice(1, -1).forEach((value) => {
+    const y = geometry.projectPoint({ x: 0, y: value }).y;
     gridLines.push(
-      `<line x1="${geometry.roomX}" y1="${y}" x2="${geometry.roomX + geometry.roomWidth}" y2="${y}" stroke="rgba(29,47,44,0.18)" stroke-dasharray="6 5" />`
+      `<line x1="${geometry.roomX}" y1="${y}" x2="${geometry.roomX + geometry.roomWidth}" y2="${y}" stroke="${stroke}" stroke-dasharray="${dasharray}" />`
     );
-  }
+  });
 
   return gridLines.join("");
+}
+
+function renderUniformGrid(geometry, item) {
+  const boundariesX = Array.from({ length: item.nx + 1 }, (_, index) => (index * item.room.length) / item.nx);
+  const boundariesY = Array.from({ length: item.ny + 1 }, (_, index) => (index * item.room.width) / item.ny);
+
+  return renderGridLinesFromBoundaries(geometry, boundariesX, boundariesY);
+}
+
+function renderCandidateGrid(geometry, item) {
+  if (item.placementMode === "adapted-ceiling") {
+    return renderGridLinesFromBoundaries(
+      geometry,
+      item.cellBoundariesX || [0, item.room.length],
+      item.cellBoundariesY || [0, item.room.width]
+    );
+  }
+
+  return renderUniformGrid(geometry, item);
+}
+
+function renderStrictReferenceGrid(geometry, item) {
+  if (!item.strictReference) {
+    return "";
+  }
+
+  const boundariesX = Array.from(
+    { length: item.strictReference.nx + 1 },
+    (_, index) => (index * item.room.length) / item.strictReference.nx
+  );
+  const boundariesY = Array.from(
+    { length: item.strictReference.ny + 1 },
+    (_, index) => (index * item.room.width) / item.strictReference.ny
+  );
+
+  return renderGridLinesFromBoundaries(
+    geometry,
+    boundariesX,
+    boundariesY,
+    "rgba(107,114,128,0.28)",
+    "4 4"
+  );
 }
 
 function renderFans(geometry, item, displayCoordinates) {
@@ -1538,13 +2316,47 @@ function getNearestWallMeasurement(room, point) {
   ].sort((a, b) => a.clearance - b.clearance)[0];
 }
 
+function getClosestPointToWall(room, coordinates) {
+  return coordinates
+    .map((point, index) => ({
+      index,
+      point,
+      nearestWall: getNearestWallMeasurement(room, point)
+    }))
+    .sort((a, b) => a.nearestWall.clearance - b.nearestWall.clearance)[0];
+}
+
+function getClosestPair(coordinates) {
+  if (coordinates.length < 2) {
+    return null;
+  }
+
+  let best = null;
+  let bestDistance = Number.POSITIVE_INFINITY;
+
+  for (let firstIndex = 0; firstIndex < coordinates.length; firstIndex += 1) {
+    for (let secondIndex = firstIndex + 1; secondIndex < coordinates.length; secondIndex += 1) {
+      const distance = Math.hypot(
+        coordinates[firstIndex].x - coordinates[secondIndex].x,
+        coordinates[firstIndex].y - coordinates[secondIndex].y
+      );
+
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        best = [firstIndex, secondIndex];
+      }
+    }
+  }
+
+  return best;
+}
+
 function renderCandidateMeasurements(geometry, candidate, displayCoordinates) {
   if (displayCoordinates.length === 0) {
     return "";
   }
 
-  const firstPoint = displayCoordinates[0];
-  const firstRenderedPoint = geometry.projectPoint(firstPoint);
+  const firstRenderedPoint = geometry.projectPoint(displayCoordinates[0]);
   const radius = (candidate.diameter / 2) * geometry.scale;
   const measurements = [];
 
@@ -1562,22 +2374,36 @@ function renderCandidateMeasurements(geometry, candidate, displayCoordinates) {
     )
   );
 
-  const nearestWall = getNearestWallMeasurement(candidate.room, firstPoint);
+  const closestToWall =
+    Number.isInteger(candidate.minimumWallPointIndex) &&
+    displayCoordinates[candidate.minimumWallPointIndex]
+      ? {
+          point: displayCoordinates[candidate.minimumWallPointIndex],
+          nearestWall: getNearestWallMeasurement(
+            candidate.room,
+            displayCoordinates[candidate.minimumWallPointIndex]
+          )
+        }
+      : getClosestPointToWall(candidate.room, displayCoordinates);
   const displayedWallClearance =
     candidate.ceilingAssessment?.wallClearance || candidate.wallClearance;
+  const wallRenderedPoint = geometry.projectPoint(closestToWall.point);
 
-  if (nearestWall.axis === "x") {
-    const wallX = nearestWall.boundary === 0 ? geometry.roomX : geometry.roomX + geometry.roomWidth;
+  if (closestToWall.nearestWall.axis === "x") {
+    const wallX =
+      closestToWall.nearestWall.boundary === 0
+        ? geometry.roomX
+        : geometry.roomX + geometry.roomWidth;
     const lineY = Math.min(
       geometry.height - 14,
-      firstRenderedPoint.y + radius + (geometry.compactMode ? 12 : 16)
+      wallRenderedPoint.y + radius + (geometry.compactMode ? 12 : 16)
     );
 
     measurements.push(
       svgDimensionLine(
         wallX,
         lineY,
-        firstRenderedPoint.x,
+        wallRenderedPoint.x,
         lineY,
         `Mur ${formatMeters(displayedWallClearance)}`,
         "middle",
@@ -1587,10 +2413,13 @@ function renderCandidateMeasurements(geometry, candidate, displayCoordinates) {
       )
     );
   } else {
-    const wallY = nearestWall.boundary === 0 ? geometry.roomY : geometry.roomY + geometry.roomHeight;
+    const wallY =
+      closestToWall.nearestWall.boundary === 0
+        ? geometry.roomY
+        : geometry.roomY + geometry.roomHeight;
     const lineX = Math.min(
       geometry.width - 16,
-      firstRenderedPoint.x + radius + (geometry.compactMode ? 12 : 16)
+      wallRenderedPoint.x + radius + (geometry.compactMode ? 12 : 16)
     );
 
     measurements.push(
@@ -1598,7 +2427,7 @@ function renderCandidateMeasurements(geometry, candidate, displayCoordinates) {
         lineX,
         wallY,
         lineX,
-        firstRenderedPoint.y,
+        wallRenderedPoint.y,
         `Mur ${formatMeters(displayedWallClearance)}`,
         "start",
         8 + geometry.compactOffset,
@@ -1609,54 +2438,26 @@ function renderCandidateMeasurements(geometry, candidate, displayCoordinates) {
   }
 
   if (candidate.interFanSpacing) {
-    const displayCellLength = geometry.rotateForFit ? candidate.cellWidth : candidate.cellLength;
-    const displayCellHeight = geometry.rotateForFit ? candidate.cellLength : candidate.cellWidth;
-    const displayNx = geometry.rotateForFit ? candidate.ny : candidate.nx;
-    const displayNy = geometry.rotateForFit ? candidate.nx : candidate.ny;
-    const horizontalSpacing = displayNx > 1 ? displayCellLength : Number.POSITIVE_INFINITY;
-    const verticalSpacing = displayNy > 1 ? displayCellHeight : Number.POSITIVE_INFINITY;
+    const spacingPair =
+      Array.isArray(candidate.minimumSpacingPairIndices) &&
+      candidate.minimumSpacingPairIndices.length === 2
+        ? candidate.minimumSpacingPairIndices
+        : getClosestPair(displayCoordinates);
 
-    if (horizontalSpacing <= verticalSpacing) {
-      const secondRenderedPoint = geometry.projectPoint({
-        x: firstPoint.x + displayCellLength,
-        y: firstPoint.y
-      });
-      const lineY = Math.max(
-        geometry.roomY + 10,
-        firstRenderedPoint.y - radius - (geometry.compactMode ? 26 : 34)
-      );
+    if (spacingPair) {
+      const firstSpacingPoint = geometry.projectPoint(displayCoordinates[spacingPair[0]]);
+      const secondSpacingPoint = geometry.projectPoint(displayCoordinates[spacingPair[1]]);
+
       measurements.push(
         svgDimensionLine(
-          firstRenderedPoint.x,
-          lineY,
-          secondRenderedPoint.x,
-          lineY,
+          firstSpacingPoint.x,
+          firstSpacingPoint.y,
+          secondSpacingPoint.x,
+          secondSpacingPoint.y,
           `Entraxe ${formatMeters(candidate.interFanSpacing)}`,
           "middle",
           0,
-          geometry.compactMode ? -6 : -8,
-          geometry.labelFontSize
-        )
-      );
-    } else {
-      const secondRenderedPoint = geometry.projectPoint({
-        x: firstPoint.x,
-        y: firstPoint.y + displayCellHeight
-      });
-      const lineX = Math.min(
-        geometry.width - 12,
-        firstRenderedPoint.x + radius + (geometry.compactMode ? 24 : 32)
-      );
-      measurements.push(
-        svgDimensionLine(
-          lineX,
-          firstRenderedPoint.y,
-          lineX,
-          secondRenderedPoint.y,
-          `Entraxe ${formatMeters(candidate.interFanSpacing)}`,
-          "start",
-          8 + geometry.compactOffset,
-          -2,
+          geometry.compactMode ? -10 : -12,
           geometry.labelFontSize
         )
       );
@@ -1677,7 +2478,8 @@ function svgForCandidate(candidate) {
     <svg viewBox="0 0 ${geometry.width} ${geometry.height}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
       <rect x="${geometry.roomX}" y="${geometry.roomY}" width="${geometry.roomWidth}" height="${geometry.roomHeight}" rx="${ROOM_CORNER_RADIUS}" fill="#faf5eb" stroke="rgba(29,47,44,0.2)" stroke-width="2.5" />
       ${renderCeilingOverlay(geometry, candidate.ceilingGrid)}
-      ${renderUniformGrid(geometry, candidate)}
+      ${renderStrictReferenceGrid(geometry, candidate)}
+      ${renderCandidateGrid(geometry, candidate)}
       ${theoreticalGhosts}
       ${fans}
       ${measurements}
@@ -2000,7 +2802,43 @@ function renderModelCard(title, model) {
   `;
 }
 
+function isAdaptedCandidate(candidate) {
+  return candidate.placementMode === "adapted-ceiling";
+}
+
+function renderMetricCard(label, value, detail = "") {
+  return `
+    <div class="metric-card">
+      <strong>${label}</strong>
+      <span>${value}</span>
+      ${detail ? `<small>${detail}</small>` : ""}
+    </div>
+  `;
+}
+
+function formatAdaptedRange(min, max) {
+  if (!Number.isFinite(min) || !Number.isFinite(max)) {
+    return "—";
+  }
+
+  if (Math.abs(max - min) <= EPS) {
+    return formatFactor(min);
+  }
+
+  return `${formatFactor(min)} - ${formatFactor(max)}`;
+}
+
+function getAdaptedWorstFactorLabel(candidate) {
+  return Number.isFinite(candidate.adaptedMetrics?.ffMax)
+    ? formatFactor(candidate.adaptedMetrics.ffMax)
+    : "—";
+}
+
 function formatCeilingShiftLabel(assessment) {
+  if (assessment?.adjustmentLabel) {
+    return assessment.adjustmentLabel;
+  }
+
   if (!assessment?.shiftApplied) {
     return "Aucun decalage";
   }
@@ -2016,6 +2854,16 @@ function renderCeilingDetailItems(item) {
   }
 
   return `
+    ${
+      item.strictReference
+        ? `
+          <div class="detail-item">
+            <strong>Trame stricte reference</strong>
+            <span>${item.strictReference.label}</span>
+          </div>
+        `
+        : ""
+    }
     <div class="detail-item">
       <strong>Compatibilite faux plafond</strong>
       <span>${assessment.compatible ? "Compatible" : "Non compatible"}</span>
@@ -2036,6 +2884,21 @@ function renderCeilingNotice(item) {
 
   if (!assessment?.enabled) {
     return "";
+  }
+
+  if (isAdaptedCandidate(item)) {
+    return `
+      <div class="notice warning">
+        <strong>Option adaptee faux plafond.</strong>
+        ${assessment.reasonText}
+        ${
+          item.strictReference
+            ? ` Reference stricte remplacee : ${item.strictReference.label}.`
+            : ""
+        }
+        ${assessment.visualCheckNote ? ` ${assessment.visualCheckNote}` : ""}
+      </div>
+    `;
   }
 
   return `
@@ -2239,17 +3102,46 @@ function renderBrasse2Section(candidate, brasse2Models, realDiameters) {
 function candidateCard(candidate, rank, brasse2Models, realDiameters, selectedOptionKeys) {
   const warnings = getCandidateWarnings(candidate);
   const isSelectedForExport = selectedOptionKeys.has(candidate.key);
+  const adapted = isAdaptedCandidate(candidate);
+  const subtitle = adapted
+    ? `${candidate.fanCount} brasseur${candidate.fanCount > 1 ? "s" : ""} en option adaptee faux plafond sur une trame ${candidate.nx} × ${candidate.ny}.${candidate.strictReference ? ` Reference stricte remplacee : ${candidate.strictReference.label}.` : ""}`
+    : `${candidate.fanCount} brasseur${candidate.fanCount > 1 ? "s" : ""} centre${candidate.fanCount > 1 ? "s" : ""} dans des cellules de ${formatMeters(candidate.cellLength)} × ${formatMeters(candidate.cellWidth)}, avec un diametre BRASSE II retenu de ${formatMeters(candidate.diameter)}.`;
+  const metricCards = adapted
+    ? [
+        renderMetricCard(
+          "Diametre réel retenu",
+          formatMeters(candidate.diameter),
+          "Option adaptee faux plafond"
+        ),
+        renderMetricCard(
+          "Trame finale",
+          `${candidate.nx} × ${candidate.ny}`,
+          `${candidate.fanCount} brasseur${candidate.fanCount > 1 ? "s" : ""}`
+        ),
+        renderMetricCard(
+          "FCC recalcule",
+          formatAdaptedRange(candidate.adaptedMetrics?.fccMin, candidate.adaptedMetrics?.fccMax),
+          `Pire cas : ${formatFactor(candidate.adaptedMetrics?.fccMin ?? candidate.coverageFactor)}`
+        ),
+        renderMetricCard(
+          "Facteur de forme recalcule",
+          formatAdaptedRange(candidate.adaptedMetrics?.ffMin, candidate.adaptedMetrics?.ffMax),
+          `Pire cas : ${getAdaptedWorstFactorLabel(candidate)}`
+        )
+      ].join("")
+    : [
+        renderMetricCard("Diametre réel retenu", formatMeters(candidate.diameter)),
+        renderMetricCard("Diametre theorique max", formatMeters(candidate.theoreticalMaxDiameter)),
+        renderMetricCard("Facteur de forme", formatFactor(candidate.formFactor)),
+        renderMetricCard("FCC reel", formatFactor(candidate.coverageFactor))
+      ].join("");
 
   return `
     <article class="result-card">
       <div class="result-head">
         <div>
           <h3 class="result-title">Option ${rank}</h3>
-          <p class="result-subtitle">
-            ${candidate.fanCount} brasseur${candidate.fanCount > 1 ? "s" : ""} centre${candidate.fanCount > 1 ? "s" : ""}
-            dans des cellules de ${formatMeters(candidate.cellLength)} × ${formatMeters(candidate.cellWidth)},
-            avec un diametre BRASSE II retenu de ${formatMeters(candidate.diameter)}.
-          </p>
+          <p class="result-subtitle">${subtitle}</p>
         </div>
         ${renderExportOptionToggle(candidate.key, isSelectedForExport)}
       </div>
@@ -2258,24 +3150,7 @@ function candidateCard(candidate, rank, brasse2Models, realDiameters, selectedOp
         <div class="plan-wrap" style="${planWrapStyle(candidate)}">${svgForCandidate(candidate)}</div>
 
         <div class="stack">
-          <div class="metric-grid">
-            <div class="metric-card">
-              <strong>Diametre réel retenu</strong>
-              <span>${formatMeters(candidate.diameter)}</span>
-            </div>
-            <div class="metric-card">
-              <strong>Diametre theorique max</strong>
-              <span>${formatMeters(candidate.theoreticalMaxDiameter)}</span>
-            </div>
-            <div class="metric-card">
-              <strong>Facteur de forme</strong>
-              <span>${formatFactor(candidate.formFactor)}</span>
-            </div>
-            <div class="metric-card">
-              <strong>FCC reel</strong>
-              <span>${formatFactor(candidate.coverageFactor)}</span>
-            </div>
-          </div>
+          <div class="metric-grid">${metricCards}</div>
 
           <div class="detail-list">
             <div class="detail-item">
@@ -2297,6 +3172,20 @@ function candidateCard(candidate, rank, brasse2Models, realDiameters, selectedOp
               <strong>Entre brasseurs</strong>
               <span>${candidate.interFanSpacing ? `${formatMeters(candidate.interFanSpacing)} &gt; ${formatNumber(2.5, 1)} × D` : "Non applicable (un seul brasseur)"}</span>
             </div>
+            ${
+              adapted
+                ? `
+                  <div class="detail-item">
+                    <strong>FCC pire cas</strong>
+                    <span>${formatFactor(candidate.adaptedMetrics?.fccMin ?? candidate.coverageFactor)}</span>
+                  </div>
+                  <div class="detail-item">
+                    <strong>Facteur de forme pire cas</strong>
+                    <span>${getAdaptedWorstFactorLabel(candidate)}</span>
+                  </div>
+                `
+                : ""
+            }
             <div class="detail-item detail-item-stack">
               <strong>Diametres BRASSE II admissibles (FCC &gt;= 0,2)</strong>
               <span>${candidate.compatibleRealDiameters.map((option) => formatDiameterCm(option.diameter)).join(", ")}</span>
@@ -2321,12 +3210,11 @@ function candidateCard(candidate, rank, brasse2Models, realDiameters, selectedOp
   `;
 }
 
-function renderSummary(dom, room, candidates, brasse2Models) {
+function renderSummary(dom, room, candidates, brasse2Models, totalOptionCount = candidates.length) {
   const roomArea = room.length * room.width;
-  const displayedCandidates = candidates.slice(0, 5);
-  const compatibleModels = getDistinctCompatibleModels(displayedCandidates, brasse2Models);
-  const diameterSummary = getMaxDiameterSummary(displayedCandidates);
-  const mountSummary = getNeutralMountSummary(displayedCandidates);
+  const compatibleModels = getDistinctCompatibleModels(candidates, brasse2Models);
+  const diameterSummary = getMaxDiameterSummary(candidates);
+  const mountSummary = getNeutralMountSummary(candidates);
 
   dom.summaryGrid.innerHTML = [
     createSummaryCard(
@@ -2336,7 +3224,7 @@ function renderSummary(dom, room, candidates, brasse2Models) {
     ),
     createSummaryCard(
       "Options valides",
-      `${candidates.length}`,
+      `${totalOptionCount}`,
       `Montages visibles : ${mountSummary}`
     ),
     createSummaryCard(
@@ -2416,6 +3304,56 @@ function renderResults(dom, candidates, brasse2Models, realDiameters, selectedOp
 }
 
 // src/report/pdf.js
+function isAdaptedCandidate(option) {
+  return option.placementMode === "adapted-ceiling";
+}
+
+function formatCandidateCoverageSummary(option) {
+  if (!isAdaptedCandidate(option)) {
+    return formatFactor(option.coverageFactor);
+  }
+
+  return `${formatFactor(option.adaptedMetrics.fccMin)} a ${formatFactor(option.adaptedMetrics.fccMax)}`;
+}
+
+function formatCandidateCoverageWorst(option) {
+  return formatFactor(
+    isAdaptedCandidate(option) ? option.adaptedMetrics.fccMin : option.coverageFactor
+  );
+}
+
+function formatCandidateFormFactorSummary(option) {
+  if (!isAdaptedCandidate(option)) {
+    return formatFactor(option.formFactor);
+  }
+
+  return `${formatFactor(option.adaptedMetrics.ffMin)} a ${formatFactor(option.adaptedMetrics.ffMax)}`;
+}
+
+function formatCandidateFormFactorWorst(option) {
+  return formatFactor(
+    isAdaptedCandidate(option) ? option.adaptedMetrics.ffMax : option.formFactor
+  );
+}
+
+function getOptionHeading(option) {
+  if (!isAdaptedCandidate(option)) {
+    return `${option.nx} × ${option.ny} cellules`;
+  }
+
+  return `${option.nx} × ${option.ny} - option adaptee faux plafond`;
+}
+
+function getOptionSubheading(option) {
+  const base = `${option.fanCount} brasseur${option.fanCount > 1 ? "s" : ""} • ${option.mountMode.label}`;
+
+  if (!isAdaptedCandidate(option) || !option.strictReference) {
+    return base;
+  }
+
+  return `${base} • reference stricte : ${option.strictReference.label}`;
+}
+
 function getAllReportOptions(state) {
   if (!state) {
     return [];
@@ -2616,17 +3554,17 @@ function renderSelectedOptionsOverview(state, selectedOptions) {
   if (state.kind === "uniformity-ok") {
     const rows = selectedOptions.map((option) => [
       `Option ${getReportOptionNumber(state, option)}`,
-      `${option.nx} × ${option.ny}`,
+      isAdaptedCandidate(option) ? `${option.nx} × ${option.ny} adaptee` : `${option.nx} × ${option.ny}`,
       formatMeters(option.diameter),
       option.mountMode.label,
-      formatFactor(option.coverageFactor)
+      formatCandidateCoverageWorst(option)
     ]);
 
     return `
       <section class="report-block">
         <h2>Synthese de ou des option(s) retenue(s) :</h2>
         ${renderReportTable(
-          ["Option", "Trame", "Diametre reel", "Montage", "FCC reel"],
+          ["Option", "Trame", "Diametre reel", "Montage", "FCC pire cas"],
           rows,
           true
         )}
@@ -2642,15 +3580,21 @@ function renderUniformityOptionPage(state, option, brasse2Models) {
     <section class="report-page report-option-page">
       <div class="report-section-head">
         <p class="report-section-kicker">Option ${optionNumber}</p>
-        <h2>${escapeHtml(`${option.nx} × ${option.ny} cellules`)}</h2>
-        <p>${escapeHtml(`${option.fanCount} brasseur${option.fanCount > 1 ? "s" : ""} • ${option.mountMode.label}`)}</p>
+        <h2>${escapeHtml(getOptionHeading(option))}</h2>
+        <p>${escapeHtml(getOptionSubheading(option))}</p>
       </div>
 
       ${renderReportMetricGrid([
         ["Diametre reel retenu", formatMeters(option.diameter)],
         ["Diametre theorique max", formatMeters(option.theoreticalMaxDiameter)],
-        ["Facteur de forme", formatFactor(option.formFactor)],
-        ["FCC reel", formatFactor(option.coverageFactor)],
+        [
+          isAdaptedCandidate(option) ? "Facteur de forme recalcule" : "Facteur de forme",
+          formatCandidateFormFactorSummary(option)
+        ],
+        [
+          isAdaptedCandidate(option) ? "FCC recalcule" : "FCC reel",
+          formatCandidateCoverageSummary(option)
+        ],
         ["Hauteur sous pales", formatMeters(option.bladeHeight)],
         ["Plafond-pales", formatMeters(option.mountDistance)]
       ])}
@@ -2662,7 +3606,15 @@ function renderUniformityOptionPage(state, option, brasse2Models) {
             ["Lecture", "Valeur"],
             [
               ["Montage", option.mountMode.label],
-              ["Cellule", `${formatMeters(option.cellLength)} × ${formatMeters(option.cellWidth)}`],
+              [
+                "Trame",
+                isAdaptedCandidate(option)
+                  ? `${option.nx} × ${option.ny} adaptee`
+                  : `${formatMeters(option.cellLength)} × ${formatMeters(option.cellWidth)}`
+              ],
+              ...(option.strictReference
+                ? [["Reference stricte", option.strictReference.label]]
+                : []),
               ["Mur limitant", `${formatMeters(option.wallClearance)} > ${formatMeters(option.diameter)}`],
               [
                 "Entraxe mini",
@@ -2670,6 +3622,18 @@ function renderUniformityOptionPage(state, option, brasse2Models) {
                   ? `${formatMeters(option.interFanSpacing)} > 2,5 × D`
                   : "Non applicable"
               ],
+              ...(isAdaptedCandidate(option)
+                ? [
+                    [
+                      "FCC pire cas",
+                      formatCandidateCoverageWorst(option)
+                    ],
+                    [
+                      "Facteur de forme pire cas",
+                      formatCandidateFormFactorWorst(option)
+                    ]
+                  ]
+                : []),
               ["Diametres admissibles", formatDiameterCmList(option.compatibleRealDiameters)]
             ],
             true
@@ -3092,28 +4056,6 @@ function renderCeilingPanel() {
   return renderCeilingEditor(dom, state, getRoomInputs());
 }
 
-function getActiveCeilingGrid(room) {
-  if (!state.ceilingLayout.enabled) {
-    return null;
-  }
-
-  return buildCeilingGrid(room, state.ceilingLayout);
-}
-
-function attachCeilingAssessments(items, room) {
-  const ceilingGrid = getActiveCeilingGrid(room);
-
-  if (!ceilingGrid) {
-    return items;
-  }
-
-  return items.map((item) => ({
-    ...item,
-    ceilingGrid,
-    ceilingAssessment: assessOptionCeilingCompatibility(item, ceilingGrid)
-  }));
-}
-
 function updateHeader({ room, recommendation = "", generatedAt = new Date() }) {
   refreshReportHeader(dom, {
     simulationName: getSimulationName(),
@@ -3241,7 +4183,7 @@ function renderUniformityEmpty(room, fallbackFlush, generatedAt) {
 }
 
 function render() {
-  renderCeilingPanel();
+  const ceilingGrid = renderCeilingPanel();
 
   const rawValues = getRoomInputs();
   const issues = validateInputs(rawValues);
@@ -3260,17 +4202,30 @@ function render() {
     height: rawValues.height
   };
   const modes = getSelectedModes();
-  const candidates = attachCeilingAssessments(
-    enumerateCandidates(room, MAX_GRID_FANS, modes, realDiameters),
-    room
-  );
+  const strictCandidates = enumerateCandidates(room, MAX_GRID_FANS, modes, realDiameters);
   const fallbackFlush =
-    candidates.length === 0 ? getFallbackFlushCandidate(room, MAX_GRID_FANS, realDiameters) : null;
+    strictCandidates.length === 0
+      ? getFallbackFlushCandidate(room, MAX_GRID_FANS, realDiameters)
+      : null;
 
-  if (candidates.length === 0) {
+  if (strictCandidates.length === 0) {
     renderUniformityEmpty(room, fallbackFlush, generatedAt);
     return;
   }
+
+  const candidates = ceilingGrid
+    ? buildCeilingAwareDisplayCandidates(
+        strictCandidates,
+        room,
+        modes,
+        realDiameters,
+        ceilingGrid,
+        MAX_GRID_FANS
+      )
+    : strictCandidates.slice(0, 5).map((candidate) => ({
+        ...candidate,
+        placementMode: "strict"
+      }));
 
   updateHeader({
     room,
@@ -3281,13 +4236,13 @@ function render() {
     kind: "uniformity-ok",
     simulationName: getSimulationName(),
     room,
-    candidates: candidates.slice(0, 5),
-    selectedOptionKeys: createSelectedReportOptionKeys(candidates.slice(0, 5)),
+    candidates,
+    selectedOptionKeys: createSelectedReportOptionKeys(candidates),
     modesLabel: getSelectedModesLabel(modes),
     generatedAt,
     context: `Recherche d'uniformite • option recommandee : ${candidates[0].nx} × ${candidates[0].ny}`
   });
-  renderSummary(dom, room, candidates, brasse2Models);
+  renderSummary(dom, room, candidates, brasse2Models, strictCandidates.length);
   renderStatusNote(dom, room, candidates, fallbackFlush, modes, realDiameters);
   renderResults(
     dom,

@@ -179,7 +179,43 @@ function renderModelCard(title, model) {
   `;
 }
 
+function isAdaptedCandidate(candidate) {
+  return candidate.placementMode === "adapted-ceiling";
+}
+
+function renderMetricCard(label, value, detail = "") {
+  return `
+    <div class="metric-card">
+      <strong>${label}</strong>
+      <span>${value}</span>
+      ${detail ? `<small>${detail}</small>` : ""}
+    </div>
+  `;
+}
+
+function formatAdaptedRange(min, max) {
+  if (!Number.isFinite(min) || !Number.isFinite(max)) {
+    return "—";
+  }
+
+  if (Math.abs(max - min) <= EPS) {
+    return formatFactor(min);
+  }
+
+  return `${formatFactor(min)} - ${formatFactor(max)}`;
+}
+
+function getAdaptedWorstFactorLabel(candidate) {
+  return Number.isFinite(candidate.adaptedMetrics?.ffMax)
+    ? formatFactor(candidate.adaptedMetrics.ffMax)
+    : "—";
+}
+
 function formatCeilingShiftLabel(assessment) {
+  if (assessment?.adjustmentLabel) {
+    return assessment.adjustmentLabel;
+  }
+
   if (!assessment?.shiftApplied) {
     return "Aucun decalage";
   }
@@ -195,6 +231,16 @@ function renderCeilingDetailItems(item) {
   }
 
   return `
+    ${
+      item.strictReference
+        ? `
+          <div class="detail-item">
+            <strong>Trame stricte reference</strong>
+            <span>${item.strictReference.label}</span>
+          </div>
+        `
+        : ""
+    }
     <div class="detail-item">
       <strong>Compatibilite faux plafond</strong>
       <span>${assessment.compatible ? "Compatible" : "Non compatible"}</span>
@@ -215,6 +261,21 @@ function renderCeilingNotice(item) {
 
   if (!assessment?.enabled) {
     return "";
+  }
+
+  if (isAdaptedCandidate(item)) {
+    return `
+      <div class="notice warning">
+        <strong>Option adaptee faux plafond.</strong>
+        ${assessment.reasonText}
+        ${
+          item.strictReference
+            ? ` Reference stricte remplacee : ${item.strictReference.label}.`
+            : ""
+        }
+        ${assessment.visualCheckNote ? ` ${assessment.visualCheckNote}` : ""}
+      </div>
+    `;
   }
 
   return `
@@ -418,17 +479,46 @@ function renderBrasse2Section(candidate, brasse2Models, realDiameters) {
 function candidateCard(candidate, rank, brasse2Models, realDiameters, selectedOptionKeys) {
   const warnings = getCandidateWarnings(candidate);
   const isSelectedForExport = selectedOptionKeys.has(candidate.key);
+  const adapted = isAdaptedCandidate(candidate);
+  const subtitle = adapted
+    ? `${candidate.fanCount} brasseur${candidate.fanCount > 1 ? "s" : ""} en option adaptee faux plafond sur une trame ${candidate.nx} × ${candidate.ny}.${candidate.strictReference ? ` Reference stricte remplacee : ${candidate.strictReference.label}.` : ""}`
+    : `${candidate.fanCount} brasseur${candidate.fanCount > 1 ? "s" : ""} centre${candidate.fanCount > 1 ? "s" : ""} dans des cellules de ${formatMeters(candidate.cellLength)} × ${formatMeters(candidate.cellWidth)}, avec un diametre BRASSE II retenu de ${formatMeters(candidate.diameter)}.`;
+  const metricCards = adapted
+    ? [
+        renderMetricCard(
+          "Diametre réel retenu",
+          formatMeters(candidate.diameter),
+          "Option adaptee faux plafond"
+        ),
+        renderMetricCard(
+          "Trame finale",
+          `${candidate.nx} × ${candidate.ny}`,
+          `${candidate.fanCount} brasseur${candidate.fanCount > 1 ? "s" : ""}`
+        ),
+        renderMetricCard(
+          "FCC recalcule",
+          formatAdaptedRange(candidate.adaptedMetrics?.fccMin, candidate.adaptedMetrics?.fccMax),
+          `Pire cas : ${formatFactor(candidate.adaptedMetrics?.fccMin ?? candidate.coverageFactor)}`
+        ),
+        renderMetricCard(
+          "Facteur de forme recalcule",
+          formatAdaptedRange(candidate.adaptedMetrics?.ffMin, candidate.adaptedMetrics?.ffMax),
+          `Pire cas : ${getAdaptedWorstFactorLabel(candidate)}`
+        )
+      ].join("")
+    : [
+        renderMetricCard("Diametre réel retenu", formatMeters(candidate.diameter)),
+        renderMetricCard("Diametre theorique max", formatMeters(candidate.theoreticalMaxDiameter)),
+        renderMetricCard("Facteur de forme", formatFactor(candidate.formFactor)),
+        renderMetricCard("FCC reel", formatFactor(candidate.coverageFactor))
+      ].join("");
 
   return `
     <article class="result-card">
       <div class="result-head">
         <div>
           <h3 class="result-title">Option ${rank}</h3>
-          <p class="result-subtitle">
-            ${candidate.fanCount} brasseur${candidate.fanCount > 1 ? "s" : ""} centre${candidate.fanCount > 1 ? "s" : ""}
-            dans des cellules de ${formatMeters(candidate.cellLength)} × ${formatMeters(candidate.cellWidth)},
-            avec un diametre BRASSE II retenu de ${formatMeters(candidate.diameter)}.
-          </p>
+          <p class="result-subtitle">${subtitle}</p>
         </div>
         ${renderExportOptionToggle(candidate.key, isSelectedForExport)}
       </div>
@@ -437,24 +527,7 @@ function candidateCard(candidate, rank, brasse2Models, realDiameters, selectedOp
         <div class="plan-wrap" style="${planWrapStyle(candidate)}">${svgForCandidate(candidate)}</div>
 
         <div class="stack">
-          <div class="metric-grid">
-            <div class="metric-card">
-              <strong>Diametre réel retenu</strong>
-              <span>${formatMeters(candidate.diameter)}</span>
-            </div>
-            <div class="metric-card">
-              <strong>Diametre theorique max</strong>
-              <span>${formatMeters(candidate.theoreticalMaxDiameter)}</span>
-            </div>
-            <div class="metric-card">
-              <strong>Facteur de forme</strong>
-              <span>${formatFactor(candidate.formFactor)}</span>
-            </div>
-            <div class="metric-card">
-              <strong>FCC reel</strong>
-              <span>${formatFactor(candidate.coverageFactor)}</span>
-            </div>
-          </div>
+          <div class="metric-grid">${metricCards}</div>
 
           <div class="detail-list">
             <div class="detail-item">
@@ -476,6 +549,20 @@ function candidateCard(candidate, rank, brasse2Models, realDiameters, selectedOp
               <strong>Entre brasseurs</strong>
               <span>${candidate.interFanSpacing ? `${formatMeters(candidate.interFanSpacing)} &gt; ${formatNumber(2.5, 1)} × D` : "Non applicable (un seul brasseur)"}</span>
             </div>
+            ${
+              adapted
+                ? `
+                  <div class="detail-item">
+                    <strong>FCC pire cas</strong>
+                    <span>${formatFactor(candidate.adaptedMetrics?.fccMin ?? candidate.coverageFactor)}</span>
+                  </div>
+                  <div class="detail-item">
+                    <strong>Facteur de forme pire cas</strong>
+                    <span>${getAdaptedWorstFactorLabel(candidate)}</span>
+                  </div>
+                `
+                : ""
+            }
             <div class="detail-item detail-item-stack">
               <strong>Diametres BRASSE II admissibles (FCC &gt;= 0,2)</strong>
               <span>${candidate.compatibleRealDiameters.map((option) => formatDiameterCm(option.diameter)).join(", ")}</span>
@@ -500,12 +587,11 @@ function candidateCard(candidate, rank, brasse2Models, realDiameters, selectedOp
   `;
 }
 
-export function renderSummary(dom, room, candidates, brasse2Models) {
+export function renderSummary(dom, room, candidates, brasse2Models, totalOptionCount = candidates.length) {
   const roomArea = room.length * room.width;
-  const displayedCandidates = candidates.slice(0, 5);
-  const compatibleModels = getDistinctCompatibleModels(displayedCandidates, brasse2Models);
-  const diameterSummary = getMaxDiameterSummary(displayedCandidates);
-  const mountSummary = getNeutralMountSummary(displayedCandidates);
+  const compatibleModels = getDistinctCompatibleModels(candidates, brasse2Models);
+  const diameterSummary = getMaxDiameterSummary(candidates);
+  const mountSummary = getNeutralMountSummary(candidates);
 
   dom.summaryGrid.innerHTML = [
     createSummaryCard(
@@ -515,7 +601,7 @@ export function renderSummary(dom, room, candidates, brasse2Models) {
     ),
     createSummaryCard(
       "Options valides",
-      `${candidates.length}`,
+      `${totalOptionCount}`,
       `Montages visibles : ${mountSummary}`
     ),
     createSummaryCard(

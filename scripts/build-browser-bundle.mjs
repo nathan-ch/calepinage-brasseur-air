@@ -18,6 +18,7 @@ const sourceFiles = [
   "src/core/catalog.js",
   "src/core/ceilingGrid.js",
   "src/core/ceilingAssessment.js",
+  "src/core/ceilingAdaptive.js",
   "src/core/calepinage.js",
   "src/ui/catalog.js",
   "src/ui/planSvg.js",

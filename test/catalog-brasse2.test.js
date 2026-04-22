@@ -9,6 +9,8 @@ import {
 import { getFilteredCatalogModels } from "../src/core/catalog.js";
 import { getBrasse2ModelsForCandidate, buildModelPicks } from "../src/core/brasse2.js";
 import { enumerateCandidates } from "../src/core/calepinage.js";
+import { buildCeilingAwareDisplayCandidates } from "../src/core/ceilingAdaptive.js";
+import { buildCeilingGrid } from "../src/core/ceilingGrid.js";
 import { MOUNT_MODES, MAX_GRID_FANS } from "../src/core/constants.js";
 import { buildPdfReportDocument } from "../src/report/pdf.js";
 
@@ -79,4 +81,38 @@ test("le rapport PDF n'inclut que les options selectionnees", () => {
   assert.match(reportHtml, /Option 2/);
   assert.doesNotMatch(reportHtml, /Option 1<\/td>/);
   assert.doesNotMatch(reportHtml, /Option 3<\/td>/);
+});
+
+test("le rapport PDF decrit correctement une option adaptee faux plafond", () => {
+  const room = { length: 9, width: 5, height: 3 };
+  const strictCandidates = enumerateCandidates(room, MAX_GRID_FANS, MOUNT_MODES, realDiameters);
+  const ceilingGrid = buildCeilingGrid(room, {
+    tileSize: 0.6,
+    xAnchorMode: "symmetric",
+    yAnchorMode: "symmetric",
+    luminaireTiles: new Set()
+  });
+  const candidates = buildCeilingAwareDisplayCandidates(
+    strictCandidates,
+    room,
+    MOUNT_MODES,
+    realDiameters,
+    ceilingGrid,
+    MAX_GRID_FANS
+  );
+  const reportState = {
+    kind: "uniformity-ok",
+    simulationName: "Rapport adapte",
+    room,
+    candidates,
+    selectedOptionKeys: [candidates[0].key],
+    modesLabel: "Montage standard + Montage low-profile",
+    generatedAt: new Date("2026-04-22T09:00:00Z")
+  };
+
+  const reportHtml = buildPdfReportDocument(reportState, BRASSE2_MODELS);
+
+  assert.match(reportHtml, /option adaptee faux plafond/i);
+  assert.match(reportHtml, /Reference stricte/i);
+  assert.match(reportHtml, /FCC pire cas/i);
 });

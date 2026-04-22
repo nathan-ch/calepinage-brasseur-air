@@ -22,6 +22,56 @@ import {
   svgForCandidate
 } from "../ui/planSvg.js";
 
+function isAdaptedCandidate(option) {
+  return option.placementMode === "adapted-ceiling";
+}
+
+function formatCandidateCoverageSummary(option) {
+  if (!isAdaptedCandidate(option)) {
+    return formatFactor(option.coverageFactor);
+  }
+
+  return `${formatFactor(option.adaptedMetrics.fccMin)} a ${formatFactor(option.adaptedMetrics.fccMax)}`;
+}
+
+function formatCandidateCoverageWorst(option) {
+  return formatFactor(
+    isAdaptedCandidate(option) ? option.adaptedMetrics.fccMin : option.coverageFactor
+  );
+}
+
+function formatCandidateFormFactorSummary(option) {
+  if (!isAdaptedCandidate(option)) {
+    return formatFactor(option.formFactor);
+  }
+
+  return `${formatFactor(option.adaptedMetrics.ffMin)} a ${formatFactor(option.adaptedMetrics.ffMax)}`;
+}
+
+function formatCandidateFormFactorWorst(option) {
+  return formatFactor(
+    isAdaptedCandidate(option) ? option.adaptedMetrics.ffMax : option.formFactor
+  );
+}
+
+function getOptionHeading(option) {
+  if (!isAdaptedCandidate(option)) {
+    return `${option.nx} × ${option.ny} cellules`;
+  }
+
+  return `${option.nx} × ${option.ny} - option adaptee faux plafond`;
+}
+
+function getOptionSubheading(option) {
+  const base = `${option.fanCount} brasseur${option.fanCount > 1 ? "s" : ""} • ${option.mountMode.label}`;
+
+  if (!isAdaptedCandidate(option) || !option.strictReference) {
+    return base;
+  }
+
+  return `${base} • reference stricte : ${option.strictReference.label}`;
+}
+
 function getAllReportOptions(state) {
   if (!state) {
     return [];
@@ -222,17 +272,17 @@ function renderSelectedOptionsOverview(state, selectedOptions) {
   if (state.kind === "uniformity-ok") {
     const rows = selectedOptions.map((option) => [
       `Option ${getReportOptionNumber(state, option)}`,
-      `${option.nx} × ${option.ny}`,
+      isAdaptedCandidate(option) ? `${option.nx} × ${option.ny} adaptee` : `${option.nx} × ${option.ny}`,
       formatMeters(option.diameter),
       option.mountMode.label,
-      formatFactor(option.coverageFactor)
+      formatCandidateCoverageWorst(option)
     ]);
 
     return `
       <section class="report-block">
         <h2>Synthese de ou des option(s) retenue(s) :</h2>
         ${renderReportTable(
-          ["Option", "Trame", "Diametre reel", "Montage", "FCC reel"],
+          ["Option", "Trame", "Diametre reel", "Montage", "FCC pire cas"],
           rows,
           true
         )}
@@ -248,15 +298,21 @@ function renderUniformityOptionPage(state, option, brasse2Models) {
     <section class="report-page report-option-page">
       <div class="report-section-head">
         <p class="report-section-kicker">Option ${optionNumber}</p>
-        <h2>${escapeHtml(`${option.nx} × ${option.ny} cellules`)}</h2>
-        <p>${escapeHtml(`${option.fanCount} brasseur${option.fanCount > 1 ? "s" : ""} • ${option.mountMode.label}`)}</p>
+        <h2>${escapeHtml(getOptionHeading(option))}</h2>
+        <p>${escapeHtml(getOptionSubheading(option))}</p>
       </div>
 
       ${renderReportMetricGrid([
         ["Diametre reel retenu", formatMeters(option.diameter)],
         ["Diametre theorique max", formatMeters(option.theoreticalMaxDiameter)],
-        ["Facteur de forme", formatFactor(option.formFactor)],
-        ["FCC reel", formatFactor(option.coverageFactor)],
+        [
+          isAdaptedCandidate(option) ? "Facteur de forme recalcule" : "Facteur de forme",
+          formatCandidateFormFactorSummary(option)
+        ],
+        [
+          isAdaptedCandidate(option) ? "FCC recalcule" : "FCC reel",
+          formatCandidateCoverageSummary(option)
+        ],
         ["Hauteur sous pales", formatMeters(option.bladeHeight)],
         ["Plafond-pales", formatMeters(option.mountDistance)]
       ])}
@@ -268,7 +324,15 @@ function renderUniformityOptionPage(state, option, brasse2Models) {
             ["Lecture", "Valeur"],
             [
               ["Montage", option.mountMode.label],
-              ["Cellule", `${formatMeters(option.cellLength)} × ${formatMeters(option.cellWidth)}`],
+              [
+                "Trame",
+                isAdaptedCandidate(option)
+                  ? `${option.nx} × ${option.ny} adaptee`
+                  : `${formatMeters(option.cellLength)} × ${formatMeters(option.cellWidth)}`
+              ],
+              ...(option.strictReference
+                ? [["Reference stricte", option.strictReference.label]]
+                : []),
               ["Mur limitant", `${formatMeters(option.wallClearance)} > ${formatMeters(option.diameter)}`],
               [
                 "Entraxe mini",
@@ -276,6 +340,18 @@ function renderUniformityOptionPage(state, option, brasse2Models) {
                   ? `${formatMeters(option.interFanSpacing)} > 2,5 × D`
                   : "Non applicable"
               ],
+              ...(isAdaptedCandidate(option)
+                ? [
+                    [
+                      "FCC pire cas",
+                      formatCandidateCoverageWorst(option)
+                    ],
+                    [
+                      "Facteur de forme pire cas",
+                      formatCandidateFormFactorWorst(option)
+                    ]
+                  ]
+                : []),
               ["Diametres admissibles", formatDiameterCmList(option.compatibleRealDiameters)]
             ],
             true

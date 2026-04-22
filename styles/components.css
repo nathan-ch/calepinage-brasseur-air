@@ -106,6 +106,14 @@
   letter-spacing: -0.03em;
 }
 
+.metric-card small {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
 .notice {
   padding: 16px 18px;
   border-radius: 10px;

@@ -219,6 +219,20 @@ function renderCeilingOverlay(geometry, ceilingGrid) {
 function renderTheoreticalGhostCenters(geometry, item, displayCoordinates) {
   const assessment = item.ceilingAssessment;
 
+  if (item.placementMode === "adapted-ceiling" && item.strictReference) {
+    return item.strictReference.coordinates
+      .map((point, index) => {
+        const renderedPoint = geometry.projectPoint(point);
+        return `
+          <g>
+            <circle cx="${renderedPoint.x}" cy="${renderedPoint.y}" r="4.4" fill="rgba(107,114,128,0.18)" stroke="rgba(107,114,128,0.38)" stroke-dasharray="3 3" />
+            <text x="${renderedPoint.x}" y="${renderedPoint.y + 3.8}" text-anchor="middle" font-size="8.5" fill="rgba(55,65,81,0.72)" font-weight="700">${index + 1}</text>
+          </g>
+        `;
+      })
+      .join("");
+  }
+
   if (!assessment?.compatible || !assessment.shiftApplied) {
     return "";
   }
@@ -245,28 +259,72 @@ function renderTheoreticalGhostCenters(geometry, item, displayCoordinates) {
     .join("");
 }
 
-function renderUniformGrid(geometry, item) {
-  const displayCellLength = geometry.rotateForFit ? item.cellWidth : item.cellLength;
-  const displayCellHeight = geometry.rotateForFit ? item.cellLength : item.cellWidth;
-  const displayNx = geometry.rotateForFit ? item.ny : item.nx;
-  const displayNy = geometry.rotateForFit ? item.nx : item.ny;
+function renderGridLinesFromBoundaries(
+  geometry,
+  boundariesX,
+  boundariesY,
+  stroke = "rgba(29,47,44,0.18)",
+  dasharray = "6 5"
+) {
   const gridLines = [];
 
-  for (let index = 1; index < displayNx; index += 1) {
-    const x = geometry.roomX + index * displayCellLength * geometry.scale;
+  boundariesX.slice(1, -1).forEach((value) => {
+    const x = geometry.projectPoint({ x: value, y: 0 }).x;
     gridLines.push(
-      `<line x1="${x}" y1="${geometry.roomY}" x2="${x}" y2="${geometry.roomY + geometry.roomHeight}" stroke="rgba(29,47,44,0.18)" stroke-dasharray="6 5" />`
+      `<line x1="${x}" y1="${geometry.roomY}" x2="${x}" y2="${geometry.roomY + geometry.roomHeight}" stroke="${stroke}" stroke-dasharray="${dasharray}" />`
     );
-  }
+  });
 
-  for (let index = 1; index < displayNy; index += 1) {
-    const y = geometry.roomY + index * displayCellHeight * geometry.scale;
+  boundariesY.slice(1, -1).forEach((value) => {
+    const y = geometry.projectPoint({ x: 0, y: value }).y;
     gridLines.push(
-      `<line x1="${geometry.roomX}" y1="${y}" x2="${geometry.roomX + geometry.roomWidth}" y2="${y}" stroke="rgba(29,47,44,0.18)" stroke-dasharray="6 5" />`
+      `<line x1="${geometry.roomX}" y1="${y}" x2="${geometry.roomX + geometry.roomWidth}" y2="${y}" stroke="${stroke}" stroke-dasharray="${dasharray}" />`
     );
-  }
+  });
 
   return gridLines.join("");
+}
+
+function renderUniformGrid(geometry, item) {
+  const boundariesX = Array.from({ length: item.nx + 1 }, (_, index) => (index * item.room.length) / item.nx);
+  const boundariesY = Array.from({ length: item.ny + 1 }, (_, index) => (index * item.room.width) / item.ny);
+
+  return renderGridLinesFromBoundaries(geometry, boundariesX, boundariesY);
+}
+
+function renderCandidateGrid(geometry, item) {
+  if (item.placementMode === "adapted-ceiling") {
+    return renderGridLinesFromBoundaries(
+      geometry,
+      item.cellBoundariesX || [0, item.room.length],
+      item.cellBoundariesY || [0, item.room.width]
+    );
+  }
+
+  return renderUniformGrid(geometry, item);
+}
+
+function renderStrictReferenceGrid(geometry, item) {
+  if (!item.strictReference) {
+    return "";
+  }
+
+  const boundariesX = Array.from(
+    { length: item.strictReference.nx + 1 },
+    (_, index) => (index * item.room.length) / item.strictReference.nx
+  );
+  const boundariesY = Array.from(
+    { length: item.strictReference.ny + 1 },
+    (_, index) => (index * item.room.width) / item.strictReference.ny
+  );
+
+  return renderGridLinesFromBoundaries(
+    geometry,
+    boundariesX,
+    boundariesY,
+    "rgba(107,114,128,0.28)",
+    "4 4"
+  );
 }
 
 function renderFans(geometry, item, displayCoordinates) {
@@ -288,13 +346,47 @@ function getNearestWallMeasurement(room, point) {
   ].sort((a, b) => a.clearance - b.clearance)[0];
 }
 
+function getClosestPointToWall(room, coordinates) {
+  return coordinates
+    .map((point, index) => ({
+      index,
+      point,
+      nearestWall: getNearestWallMeasurement(room, point)
+    }))
+    .sort((a, b) => a.nearestWall.clearance - b.nearestWall.clearance)[0];
+}
+
+function getClosestPair(coordinates) {
+  if (coordinates.length < 2) {
+    return null;
+  }
+
+  let best = null;
+  let bestDistance = Number.POSITIVE_INFINITY;
+
+  for (let firstIndex = 0; firstIndex < coordinates.length; firstIndex += 1) {
+    for (let secondIndex = firstIndex + 1; secondIndex < coordinates.length; secondIndex += 1) {
+      const distance = Math.hypot(
+        coordinates[firstIndex].x - coordinates[secondIndex].x,
+        coordinates[firstIndex].y - coordinates[secondIndex].y
+      );
+
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        best = [firstIndex, secondIndex];
+      }
+    }
+  }
+
+  return best;
+}
+
 function renderCandidateMeasurements(geometry, candidate, displayCoordinates) {
   if (displayCoordinates.length === 0) {
     return "";
   }
 
-  const firstPoint = displayCoordinates[0];
-  const firstRenderedPoint = geometry.projectPoint(firstPoint);
+  const firstRenderedPoint = geometry.projectPoint(displayCoordinates[0]);
   const radius = (candidate.diameter / 2) * geometry.scale;
   const measurements = [];
 
@@ -312,22 +404,36 @@ function renderCandidateMeasurements(geometry, candidate, displayCoordinates) {
     )
   );
 
-  const nearestWall = getNearestWallMeasurement(candidate.room, firstPoint);
+  const closestToWall =
+    Number.isInteger(candidate.minimumWallPointIndex) &&
+    displayCoordinates[candidate.minimumWallPointIndex]
+      ? {
+          point: displayCoordinates[candidate.minimumWallPointIndex],
+          nearestWall: getNearestWallMeasurement(
+            candidate.room,
+            displayCoordinates[candidate.minimumWallPointIndex]
+          )
+        }
+      : getClosestPointToWall(candidate.room, displayCoordinates);
   const displayedWallClearance =
     candidate.ceilingAssessment?.wallClearance || candidate.wallClearance;
+  const wallRenderedPoint = geometry.projectPoint(closestToWall.point);
 
-  if (nearestWall.axis === "x") {
-    const wallX = nearestWall.boundary === 0 ? geometry.roomX : geometry.roomX + geometry.roomWidth;
+  if (closestToWall.nearestWall.axis === "x") {
+    const wallX =
+      closestToWall.nearestWall.boundary === 0
+        ? geometry.roomX
+        : geometry.roomX + geometry.roomWidth;
     const lineY = Math.min(
       geometry.height - 14,
-      firstRenderedPoint.y + radius + (geometry.compactMode ? 12 : 16)
+      wallRenderedPoint.y + radius + (geometry.compactMode ? 12 : 16)
     );
 
     measurements.push(
       svgDimensionLine(
         wallX,
         lineY,
-        firstRenderedPoint.x,
+        wallRenderedPoint.x,
         lineY,
         `Mur ${formatMeters(displayedWallClearance)}`,
         "middle",
@@ -337,10 +443,13 @@ function renderCandidateMeasurements(geometry, candidate, displayCoordinates) {
       )
     );
   } else {
-    const wallY = nearestWall.boundary === 0 ? geometry.roomY : geometry.roomY + geometry.roomHeight;
+    const wallY =
+      closestToWall.nearestWall.boundary === 0
+        ? geometry.roomY
+        : geometry.roomY + geometry.roomHeight;
     const lineX = Math.min(
       geometry.width - 16,
-      firstRenderedPoint.x + radius + (geometry.compactMode ? 12 : 16)
+      wallRenderedPoint.x + radius + (geometry.compactMode ? 12 : 16)
     );
 
     measurements.push(
@@ -348,7 +457,7 @@ function renderCandidateMeasurements(geometry, candidate, displayCoordinates) {
         lineX,
         wallY,
         lineX,
-        firstRenderedPoint.y,
+        wallRenderedPoint.y,
         `Mur ${formatMeters(displayedWallClearance)}`,
         "start",
         8 + geometry.compactOffset,
@@ -359,54 +468,26 @@ function renderCandidateMeasurements(geometry, candidate, displayCoordinates) {
   }
 
   if (candidate.interFanSpacing) {
-    const displayCellLength = geometry.rotateForFit ? candidate.cellWidth : candidate.cellLength;
-    const displayCellHeight = geometry.rotateForFit ? candidate.cellLength : candidate.cellWidth;
-    const displayNx = geometry.rotateForFit ? candidate.ny : candidate.nx;
-    const displayNy = geometry.rotateForFit ? candidate.nx : candidate.ny;
-    const horizontalSpacing = displayNx > 1 ? displayCellLength : Number.POSITIVE_INFINITY;
-    const verticalSpacing = displayNy > 1 ? displayCellHeight : Number.POSITIVE_INFINITY;
+    const spacingPair =
+      Array.isArray(candidate.minimumSpacingPairIndices) &&
+      candidate.minimumSpacingPairIndices.length === 2
+        ? candidate.minimumSpacingPairIndices
+        : getClosestPair(displayCoordinates);
 
-    if (horizontalSpacing <= verticalSpacing) {
-      const secondRenderedPoint = geometry.projectPoint({
-        x: firstPoint.x + displayCellLength,
-        y: firstPoint.y
-      });
-      const lineY = Math.max(
-        geometry.roomY + 10,
-        firstRenderedPoint.y - radius - (geometry.compactMode ? 26 : 34)
-      );
+    if (spacingPair) {
+      const firstSpacingPoint = geometry.projectPoint(displayCoordinates[spacingPair[0]]);
+      const secondSpacingPoint = geometry.projectPoint(displayCoordinates[spacingPair[1]]);
+
       measurements.push(
         svgDimensionLine(
-          firstRenderedPoint.x,
-          lineY,
-          secondRenderedPoint.x,
-          lineY,
+          firstSpacingPoint.x,
+          firstSpacingPoint.y,
+          secondSpacingPoint.x,
+          secondSpacingPoint.y,
           `Entraxe ${formatMeters(candidate.interFanSpacing)}`,
           "middle",
           0,
-          geometry.compactMode ? -6 : -8,
-          geometry.labelFontSize
-        )
-      );
-    } else {
-      const secondRenderedPoint = geometry.projectPoint({
-        x: firstPoint.x,
-        y: firstPoint.y + displayCellHeight
-      });
-      const lineX = Math.min(
-        geometry.width - 12,
-        firstRenderedPoint.x + radius + (geometry.compactMode ? 24 : 32)
-      );
-      measurements.push(
-        svgDimensionLine(
-          lineX,
-          firstRenderedPoint.y,
-          lineX,
-          secondRenderedPoint.y,
-          `Entraxe ${formatMeters(candidate.interFanSpacing)}`,
-          "start",
-          8 + geometry.compactOffset,
-          -2,
+          geometry.compactMode ? -10 : -12,
           geometry.labelFontSize
         )
       );
@@ -427,7 +508,8 @@ export function svgForCandidate(candidate) {
     <svg viewBox="0 0 ${geometry.width} ${geometry.height}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
       <rect x="${geometry.roomX}" y="${geometry.roomY}" width="${geometry.roomWidth}" height="${geometry.roomHeight}" rx="${ROOM_CORNER_RADIUS}" fill="#faf5eb" stroke="rgba(29,47,44,0.2)" stroke-width="2.5" />
       ${renderCeilingOverlay(geometry, candidate.ceilingGrid)}
-      ${renderUniformGrid(geometry, candidate)}
+      ${renderStrictReferenceGrid(geometry, candidate)}
+      ${renderCandidateGrid(geometry, candidate)}
       ${theoreticalGhosts}
       ${fans}
       ${measurements}

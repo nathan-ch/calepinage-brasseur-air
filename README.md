@@ -4,6 +4,8 @@ Outil statique de calepinage de brasseurs d'air basé sur le guide BRASSE de l'A
 
 Le site calcule des configurations de pose à partir des dimensions du local, propose des variantes `standard` et `low-profile`, puis remonte les modèles BRASSE II compatibles avec le calepinage retenu. Tout s'exécute côté navigateur : aucune saisie n'est stockée.
 
+[DEMO](https://nathan-ch.github.io/calepinage-brasseur-air)
+
 ## Lancer le projet
 
 Le runtime reste un simple site statique. L'outillage Node sert uniquement au développement et à régénérer le bundle navigateur utilisé par `index.html`.
@@ -53,3 +55,4 @@ Pour comprendre l'architecture interne et retrouver les zones de code à modifie
 - Données modèles : extraction embarquée de la base BRASSE II fournie avec le projet.
 
 Le projet reste un travail personnel et n'a pas de lien officiel avec l'ADEME.
+Le code a été en grande partie généré par IA.

@@ -27,6 +27,8 @@ Le fichier `index.html` peut aussi être ouvert directement dans le navigateur. 
 - `npm run test` : exécute les tests unitaires et de non-régression.
 - `npm run check` : enchaîne lint, tests puis génération du bundle navigateur.
 
+Pour comprendre l'architecture interne et retrouver les zones de code à modifier, voir le [guide technique développeur](docs/DEVELOPER_GUIDE.md).
+
 ## Structure du projet
 
 ```text
@@ -38,7 +40,7 @@ Le fichier `index.html` peut aussi être ouvert directement dans le navigateur. 
 │   ├── app/              # Références DOM, état et orchestration
 │   ├── core/             # Calculs métier BRASSE, formatters, tri catalogue/BRASSE II
 │   ├── report/           # Génération du rapport PDF imprimable
-│   └── ui/               # Rendu HTML/SVG, catalogue, résultats, éditeur de zones
+│   └── ui/               # Rendu HTML/SVG, catalogue et résultats
 ├── styles/               # Feuilles CSS séparées par responsabilité
 ├── test/                 # Tests node:test
 ├── index.html            # Shell statique de l'application

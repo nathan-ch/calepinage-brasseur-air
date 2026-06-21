@@ -222,6 +222,45 @@ Garder les calculs purs dans `src/core/`. Les modules `core` ne doivent pas acce
 
 Le navigateur peut garder un ancien bundle en cache pendant les tests. En cas de comportement incoherent, faire un rechargement force.
 
+## Contribuer au projet
+
+Le projet est une application statique. L'objectif est de garder un outil simple a lancer pour les utilisateurs, tout en conservant un code source modulaire pour les developpeurs.
+
+Installation locale :
+
+```bash
+npm install
+npm run build:browser
+npm run dev
+```
+
+Commandes courantes :
+
+- `npm run dev` lance le serveur statique local.
+- `npm run test` execute les tests unitaires et de non-regression.
+- `npm run lint` verifie le code JavaScript.
+- `npm run build:browser` regenere le bundle `dist/app.browser.js`.
+- `npm run check` enchaine lint, tests et generation du bundle.
+
+Conventions de modification :
+
+- modifier les sources dans `src/`, jamais directement `dist/app.browser.js`
+- garder les calculs metier dans `src/core/`
+- garder le rendu HTML/SVG dans `src/ui/`
+- garder l'export PDF dans `src/report/`
+- ajouter les references DOM dans `src/app/dom.js`
+- piloter les interactions depuis `src/main.js`
+
+Apres une modification de `src/`, lancer `npm run build:browser` ou `npm run check` afin que le site continue de fonctionner en ouverture directe de `index.html`.
+
+Recommandations de tests :
+
+- regle de calepinage, hauteur, FCC, tri : `test/calepinage.test.js`
+- modeles compatibles, catalogue, selection PDF, contenu rapport : `test/catalog-brasse2.test.js`
+- changement purement documentaire : verifier les liens et la lisibilite Markdown
+
+Avant de proposer une contribution, viser `npm run check`. Si une modification concerne une regle issue du guide BRASSE, documenter clairement si elle vient du guide, d'une interpretation technique ou d'une aide non normative.
+
 ## Tests et validation
 
 Commandes utiles :

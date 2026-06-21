@@ -2,7 +2,17 @@
   "name": "site-statique-calepinage-brasseur",
   "version": "0.1.0",
   "description": "Outil statique de calepinage de brasseurs d'air base sur les guides BRASSE.",
+  "license": "MIT",
   "type": "module",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nathan-ch/site-statique-calepinage-brasseur.git"
+  },
+  "bugs": {
+    "url": "https://github.com/nathan-ch/site-statique-calepinage-brasseur/issues"
+  },
+  "homepage": "https://github.com/nathan-ch/site-statique-calepinage-brasseur#readme",
   "scripts": {
     "build:browser": "node ./scripts/build-browser-bundle.mjs",
     "dev": "serve . -l 3000",

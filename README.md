@@ -4,6 +4,8 @@ Outil statique de calepinage de brasseurs d'air basé sur le guide BRASSE de l'A
 
 Le site calcule des configurations de pose à partir des dimensions du local, propose des variantes `standard` et `low-profile`, puis remonte les modèles BRASSE II compatibles avec le calepinage retenu. Tout s'exécute côté navigateur : aucune saisie n'est stockée.
 
+Ce projet est personnel et n'a pas de lien officiel avec l'ADEME.
+
 ## Lancer le projet
 
 Le runtime reste un simple site statique. L'outillage Node sert uniquement au développement et à régénérer le bundle navigateur utilisé par `index.html`.
@@ -27,7 +29,7 @@ Le fichier `index.html` peut aussi être ouvert directement dans le navigateur. 
 - `npm run test` : exécute les tests unitaires et de non-régression.
 - `npm run check` : enchaîne lint, tests puis génération du bundle navigateur.
 
-Pour comprendre l'architecture interne et retrouver les zones de code à modifier, voir le [guide technique développeur](docs/DEVELOPER_GUIDE.md).
+Pour comprendre l'architecture interne, contribuer au projet et retrouver les zones de code à modifier, voir le [guide technique développeur](docs/DEVELOPER_GUIDE.md).
 
 ## Structure du projet
 
@@ -47,9 +49,18 @@ Pour comprendre l'architecture interne et retrouver les zones de code à modifie
 └── brasse2-data.js       # Jeu de données source BRASSE II
 ```
 
-## Sources et données
+## Confidentialité
+
+L'outil fonctionne entièrement côté navigateur. Il n'y a pas de serveur applicatif, pas de compte utilisateur, pas de base de données et aucune saisie n'est envoyée ou stockée par le projet.
+
+## Données et attribution
 
 - Source méthodologique principale : guide BRASSE V1.0 ADEME, octobre 2023.
 - Données modèles : extraction embarquée de la base BRASSE II fournie avec le projet.
+- Page source ADEME : https://librairie.ademe.fr/energies/6791-brasse.html
 
-Le projet reste un travail personnel et n'a pas de lien officiel avec l'ADEME.
+Les données BRASSE II embarquées restent attribuées à leurs sources d'origine. La licence du code ne relicencie pas les données, marques, noms de modèles ou contenus issus des publications BRASSE/ADEME. Voir [NOTICE.md](NOTICE.md).
+
+## Licence
+
+Le code source de l'outil est publié sous licence MIT. Voir [LICENSE](LICENSE).

@@ -74,9 +74,9 @@ function renderCatalogTable(models) {
             <th>Plafond/BA</th>
             <th>H test</th>
             <th>CE dir debout</th>
-            <th>CFE dir debout</th>
             <th>CE moyen</th>
-            <th>LwA</th>
+            <th>LwA Vmin</th>
+            <th>LwA Vmax</th>
             <th>P max</th>
           </tr>
         </thead>
@@ -94,8 +94,8 @@ function renderCatalogTable(models) {
                   <td>${formatNumber(model.ceilingDistanceCm, 1)} cm</td>
                   <td>${formatNumber(model.testHeightCm, 1)} cm</td>
                   <td>${formatTemp(model.ceDirDeboutMax)}</td>
-                  <td>${formatNumber(model.cfeDirDeboutMax, 4)} °C/W</td>
                   <td>${formatTemp(model.ceAvgMax)}</td>
+                  <td>${formatDb(model.lwaMinDbA)}</td>
                   <td>${formatDb(model.lwaMaxDbA)}</td>
                   <td>${formatWatts(model.powerMaxW, 0)}</td>
                 </tr>

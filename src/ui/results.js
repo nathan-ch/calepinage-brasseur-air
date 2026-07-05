@@ -202,8 +202,8 @@ function renderModelsTable(models) {
             <th>Fixation</th>
             <th>Plafond/BA</th>
             <th>CE dir debout Vmax</th>
-            <th>CFE dir debout Vmax</th>
             <th>CE moyen Vmax</th>
+            <th>LwA Vmin</th>
             <th>LwA Vmax</th>
             <th>Lecture montage</th>
           </tr>
@@ -221,8 +221,8 @@ function renderModelsTable(models) {
                   <td>${model.fixation}</td>
                   <td>${formatNumber(model.ceilingDistanceCm, 1)} cm</td>
                   <td>${formatTemp(model.ceDirDeboutMax)}</td>
-                  <td>${formatNumber(model.cfeDirDeboutMax, 4)} °C/W</td>
                   <td>${formatTemp(model.ceAvgMax)}</td>
+                  <td>${formatDb(model.lwaMinDbA)}</td>
                   <td>${formatDb(model.lwaMaxDbA)}</td>
                   <td>${modelMountLabel(model)}</td>
                 </tr>

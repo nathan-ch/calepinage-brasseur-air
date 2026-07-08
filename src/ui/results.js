@@ -15,7 +15,6 @@ import {
 import {
   formatDb,
   formatDiameterCm,
-  formatDiameterList,
   formatFactor,
   formatMeters,
   formatNumber,
@@ -480,6 +479,16 @@ export function renderStatusNote(
         </div>
       `);
     }
+
+    if (candidates.every((c) => c.compatibleRealDiameters.length === 0)) {
+      notes.push(`
+        <div class="notice warning">
+          <strong>Aucun modèle compatible disponible dans le catalogue.</strong>
+          Les configurations théoriques proposées nécessitent des diamètres supérieurs à la limite du catalogue BRASSE II embarqué (${formatMeters(realDiameters[realDiameters.length - 1])}).
+          ${heightRequirementMessage}
+        </div>
+      `);
+    }
   }
 
   if (fallbackFlush && candidates.length === 0) {
@@ -496,9 +505,8 @@ export function renderStatusNote(
   if (!fallbackFlush && candidates.length === 0) {
     notes.push(`
       <div class="notice danger">
-        <strong>Aucun diametre réel de la liste testée ne passe dans ce local.</strong>
-        L'outil a teste ${formatDiameterList(realDiameters)} avec les regles BRASSE
-        de FCC, de distances et de hauteur.
+        <strong>Aucun calepinage théorique standard ou low-profile n'est possible dans ce local.</strong>
+        Le local ne permet pas d'implanter de brasseur d'air respectant les règles BRASSE de FCC, de distances et de hauteur.
         ${heightRequirementMessage}
       </div>
     `);

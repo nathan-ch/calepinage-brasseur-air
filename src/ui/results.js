@@ -358,38 +358,57 @@ function candidateCard(candidate, rank, brasse2Models, realDiameters, selectedOp
       customAlertsHtml = `
         <div class="notice success" style="margin-bottom: 12px;">
           <strong>Calepinage conforme</strong>
-          Cette configuration respecte toutes les règles de hauteur, de distances et de couverture recommandées par le guide BRASSE.
+          Cette configuration respecte toutes les regles de securite et de distance reglementaires.
         </div>
       `;
+      if (!c.heightRangeOk) {
+        const range = candidate.diameter < 2.13 ? "inférieure à 2 D" : "comprise entre 0,8 D et 2 D";
+        customAlertsHtml += `
+          <div class="notice warning" style="margin-bottom: 12px;">
+            <strong>Hauteur de fonctionnement non optimale</strong> : la hauteur sous pales (${formatMeters(candidate.bladeHeight)}) doit être ${range} (${formatMeters(2 * candidate.diameter)} pour ce diametre) pour assurer un bon confort. Envisagez d'ajuster la longueur de la suspension (tige).
+          </div>
+        `;
+      }
     } else {
       badge = `<span class="badge danger">Non conforme</span>`;
       const alerts = [];
       if (!c.wallClearanceOk) {
-        alerts.push(`<strong>Distance aux murs insuffisante</strong> : le diamètre (${formatMeters(candidate.diameter)}) dépasse la distance entre le centre et le mur le plus proche (${formatMeters(candidate.wallClearance)}).`);
+        alerts.push(`<strong>Distance aux murs insuffisante</strong> : le diametre (${formatMeters(candidate.diameter)}) depasse la distance entre le centre et le mur le plus proche (${formatMeters(candidate.wallClearance)}).`);
       }
       if (!c.spacingOk) {
-        alerts.push(`<strong>Entraxe insuffisant</strong> : l'entraxe entre ventilateurs (${formatMeters(candidate.interFanSpacing)}) est inférieur à la limite réglementaire de 2.5 D (${formatMeters(2.5 * candidate.diameter)}).`);
+        alerts.push(`<strong>Entraxe insuffisant</strong> : l'entraxe entre ventilateurs (${formatMeters(candidate.interFanSpacing)}) est inferieur a la limite reglementaire de 2.5 D (${formatMeters(2.5 * candidate.diameter)}).`);
       }
       if (!c.coverageOk) {
-        alerts.push(`<strong>Facteur de couverture (FCC) non optimal</strong> : le FCC calculé (${formatFactor(candidate.coverageFactor)}) est en dehors de la plage réglementaire de [0,20 - 0,40].`);
+        alerts.push(`<strong>Facteur de couverture (FCC) non optimal</strong> : le FCC calcule (${formatFactor(candidate.coverageFactor)}) est en dehors de la plage reglementaire de [0,20 - 0,40].`);
       }
       if (!c.safetyHeightOk) {
         const limit = candidate.diameter < 2.13 ? "2,13 m" : "3,05 m";
-        alerts.push(`<strong>Hauteur de sécurité insuffisante</strong> : la hauteur sous pales (${formatMeters(candidate.bladeHeight)}) est inférieure au seuil de sécurité obligatoire pour cette classe d'appareil (${limit}).`);
-      }
-      if (!c.heightRangeOk) {
-        const range = candidate.diameter < 2.13 ? "inférieure à 2 D" : "comprise entre 0,8 D et 2 D";
-        alerts.push(`<strong>Hauteur de fonctionnement non optimale</strong> : la hauteur sous pales (${formatMeters(candidate.bladeHeight)}) doit être ${range} pour assurer un bon confort.`);
+        alerts.push(`<strong>Hauteur de securite insuffisante</strong> : la hauteur sous pales (${formatMeters(candidate.bladeHeight)}) est inferieure au seuil de securite obligatoire pour cette classe d'appareil (${limit}).`);
       }
       customAlertsHtml = `
         <div class="notice danger" style="margin-bottom: 12px;">
-          <strong>Détail des non-conformités :</strong>
+          <strong>Detail des non-conformites :</strong>
           <ul style="margin: 8px 0 0; padding-left: 18px;">
             ${alerts.map((a) => `<li style="margin-bottom: 4px;">${a}</li>`).join("")}
           </ul>
         </div>
       `;
+      if (!c.heightRangeOk) {
+        const range = candidate.diameter < 2.13 ? "inférieure à 2 D" : "comprise entre 0,8 D et 2 D";
+        customAlertsHtml += `
+          <div class="notice warning" style="margin-bottom: 12px;">
+            <strong>Hauteur de fonctionnement non optimale</strong> : la hauteur sous pales (${formatMeters(candidate.bladeHeight)}) doit être ${range} (${formatMeters(2 * candidate.diameter)} pour ce diametre) pour assurer un bon confort. Envisagez d'ajuster la longueur de la suspension (tige).
+          </div>
+        `;
+      }
     }
+  } else if (candidate.isMarketAlternative) {
+    badge = "";
+    customAlertsHtml = `
+      <div class="notice success" style="margin-bottom: 12px;">
+        Le diametre choisi est compris dans les diametres courants.
+      </div>
+    `;
   }
 
   return `

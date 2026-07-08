@@ -12,7 +12,9 @@ import { MAX_GRID_FANS, MOUNT_MODES, FLUSH_MODE } from "./core/constants.js";
 import {
   enumerateCandidates,
   getFallbackFlushCandidate,
-  evaluateCustomCandidate
+  evaluateCustomCandidate,
+  findBestMarketAlternative,
+  convertCandidateToMarketDiameter
 } from "./core/calepinage.js";
 import { parseNumber, formatMeters } from "./core/formatters.js";
 import { buildHeightDiameterRequirementMessage } from "./core/messages.js";
@@ -273,6 +275,25 @@ function render() {
 
   const modes = getSelectedModes();
   const candidates = enumerateCandidates(room, MAX_GRID_FANS, modes, realDiameters);
+
+  if (candidates.length > 0) {
+    let bestMarket = findBestMarketAlternative(candidates);
+    if (bestMarket) {
+      bestMarket = convertCandidateToMarketDiameter(bestMarket);
+      const top5 = candidates.slice(0, 5);
+      const idx = top5.findIndex((c) => c.key === bestMarket.key);
+      if (idx >= 0) {
+        candidates[idx] = bestMarket;
+      } else {
+        if (candidates.length >= 5) {
+          candidates[4] = bestMarket;
+        } else {
+          candidates.push(bestMarket);
+        }
+      }
+    }
+  }
+
   const fallbackFlush =
     candidates.length === 0 ? getFallbackFlushCandidate(room, MAX_GRID_FANS, realDiameters) : null;
 

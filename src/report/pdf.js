@@ -183,9 +183,12 @@ function renderSelectedOptionsOverview(state, selectedOptions) {
 function renderUniformityOptionPage(state, option) {
   const optionNumber = getReportOptionNumber(state, option);
   const kicker = option.isCustom ? "Configuration personnalisee" : `Option ${optionNumber}`;
-  const sub = option.isCustom
-    ? `${option.fanCount} brasseur${option.fanCount > 1 ? "s" : ""} • ${option.mountMode.label} • ${option.conformity.conforming ? "CONFORME" : "NON CONFORME"}`
-    : `${option.fanCount} brasseur${option.fanCount > 1 ? "s" : ""} • ${option.mountMode.label}`;
+  let sub = `${option.fanCount} brasseur${option.fanCount > 1 ? "s" : ""} • ${option.mountMode.label}`;
+  if (option.isCustom) {
+    sub = `${option.fanCount} brasseur${option.fanCount > 1 ? "s" : ""} • ${option.mountMode.label} • ${option.conformity.conforming ? "CONFORME" : "NON CONFORME"}`;
+  } else if (option.isMarketAlternative) {
+    sub = `${option.fanCount} brasseur${option.fanCount > 1 ? "s" : ""} • ${option.mountMode.label}`;
+  }
 
   const customAlerts = [];
   if (option.isCustom) {
@@ -205,6 +208,8 @@ function renderUniformityOptionPage(state, option) {
     if (!c.heightRangeOk) {
       customAlerts.push(`Hauteur de fonctionnement non optimale (${formatMeters(option.bladeHeight)})`);
     }
+  } else if (option.isMarketAlternative) {
+    customAlerts.push("Le diametre choisi est compris dans les diametres courants.");
   }
 
   const allWarnings = [...customAlerts, ...getCandidateWarnings(option)];

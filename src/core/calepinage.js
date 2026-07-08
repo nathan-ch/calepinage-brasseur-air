@@ -323,7 +323,7 @@ export function evaluateCustomCandidate(room, fanCount, diameter, mountMode, rea
   }
 
   const recommendedSmallHeightMet = isSmall ? bladeHeight >= recommendedSmallHeight - EPS : true;
-  const conforming = wallClearanceOk && spacingOk && coverageOk && safetyHeightOk && heightRangeOk;
+  const conforming = wallClearanceOk && spacingOk && coverageOk && safetyHeightOk;
 
   // Calcul des diamètres réels compatibles pour information complémentaire
   const intervals = buildHeightFeasibility(room.height, mountMode.factor, coverageMinDiameter, Math.min(coverageMaxDiameter, cellShort / 2, spacings.length > 0 ? interFanSpacing / 2.5 : Number.POSITIVE_INFINITY));
@@ -380,5 +380,51 @@ export function evaluateCustomCandidate(room, fanCount, diameter, mountMode, rea
       heightRangeOk
     },
     strictAdvice: "Veuillez vérifier la conformité physique avec le fabricant de l'appareil choisi."
+  };
+}
+
+export function findBestMarketAlternative(candidates) {
+  const compatible = candidates.filter((c) => c.compatibleRealDiameters?.length > 0);
+  if (compatible.length === 0) {
+    return null;
+  }
+
+  return [...compatible].sort((a, b) => {
+    const maxA = Math.max(...a.compatibleRealDiameters.map((d) => d.diameter));
+    const maxB = Math.max(...b.compatibleRealDiameters.map((d) => d.diameter));
+    if (Math.abs(maxA - maxB) > 1e-5) {
+      return maxB - maxA; // larger diameter first
+    }
+    if (a.fanCount !== b.fanCount) {
+      return a.fanCount - b.fanCount; // fewer fans first
+    }
+    return compareCandidates(a, b);
+  })[0];
+}
+
+export function convertCandidateToMarketDiameter(candidate) {
+  if (!candidate.compatibleRealDiameters || candidate.compatibleRealDiameters.length === 0) {
+    return candidate;
+  }
+
+  const marketDiameter = Math.max(...candidate.compatibleRealDiameters.map((d) => d.diameter));
+  const cellArea = candidate.cellArea;
+  const coverageFactor = marketDiameter / Math.sqrt(cellArea);
+  const mountDistance = candidate.mountMode.factor * marketDiameter;
+  const bladeHeight = candidate.room.height - mountDistance;
+  const recommendedSmallHeight = 1.4 * marketDiameter;
+  const isSmall = marketDiameter < 2.13;
+  const recommendedSmallHeightMet = isSmall ? bladeHeight >= recommendedSmallHeight - 1e-9 : true;
+
+  return {
+    ...candidate,
+    diameter: marketDiameter,
+    coverageFactor,
+    mountDistance,
+    bladeHeight,
+    recommendedSmallHeight,
+    recommendedSmallHeightMet,
+    fanClass: isSmall ? "small" : "large",
+    isMarketAlternative: true
   };
 }

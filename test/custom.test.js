@@ -3,7 +3,9 @@ import assert from "node:assert/strict";
 
 import {
   findBestGridForFanCount,
-  evaluateCustomCandidate
+  evaluateCustomCandidate,
+  findBestMarketAlternative,
+  convertCandidateToMarketDiameter
 } from "../src/core/calepinage.js";
 import { MOUNT_MODES, FLUSH_MODE } from "../src/core/constants.js";
 
@@ -62,4 +64,71 @@ test("custom - evaluateCustomCandidate flush mount validation", () => {
   assert.ok(cand);
   assert.equal(cand.mountMode.id, "flush");
   assert.equal(cand.mountDistance, 0.15 * 1.32);
+});
+
+test("custom - findBestMarketAlternative selection and sorting", () => {
+  // Candidate A: 0 compatible models
+  const a = {
+    key: "A",
+    compatibleRealDiameters: []
+  };
+
+  // Candidate B: compatible with [1.22m, 1.32m] -> max = 1.32m
+  const b = {
+    key: "B",
+    fanCount: 2,
+    compatibleRealDiameters: [{ diameter: 1.22 }, { diameter: 1.32 }]
+  };
+
+  // Candidate C: compatible with [1.52m, 1.62m] -> max = 1.62m, fanCount = 4
+  const c = {
+    key: "C",
+    fanCount: 4,
+    compatibleRealDiameters: [{ diameter: 1.52 }, { diameter: 1.62 }]
+  };
+
+  // Candidate D: compatible with [1.52m, 1.62m] -> max = 1.62m, fanCount = 2 (better count!)
+  const d = {
+    key: "D",
+    fanCount: 2,
+    compatibleRealDiameters: [{ diameter: 1.52 }, { diameter: 1.62 }]
+  };
+
+  const candidates = [a, b, c, d];
+  const best = findBestMarketAlternative(candidates);
+
+  assert.ok(best);
+  assert.equal(best.key, "D"); // Pick D (max diameter 1.62m, fewest fans)
+});
+
+test("custom - convertCandidateToMarketDiameter recomputes metrics", () => {
+  const candidate = {
+    key: "test-candidate",
+    cellArea: 25,
+    mountMode: { factor: 0.35 },
+    room: { height: 3.5 },
+    compatibleRealDiameters: [{ diameter: 1.22 }, { diameter: 1.52 }]
+  };
+
+  const converted = convertCandidateToMarketDiameter(candidate);
+
+  assert.ok(converted);
+  assert.equal(converted.diameter, 1.52); // Picked largest compatible real diameter
+  assert.equal(converted.coverageFactor, 1.52 / 5); // 1.52 / sqrt(25)
+  assert.equal(converted.mountDistance, 0.35 * 1.52);
+  assert.equal(converted.bladeHeight, 3.5 - 0.35 * 1.52);
+  assert.equal(converted.isMarketAlternative, true);
+});
+
+test("custom - evaluateCustomCandidate safe but non-optimal height range", () => {
+  // Room: 7m x 7.3m, height 3.5m, 2 fans of 1.32m, standard mount
+  // safety height: bladeHeight = 3.5 - 0.35 * 1.32 = 3.038m >= 2.13m (safety Ok!)
+  // optimal height: 3.038m <= 2 * 1.32 = 2.64m (false, too high!)
+  const room = { length: 7, width: 7.3, height: 3.5 };
+  const cand = evaluateCustomCandidate(room, 2, 1.32, MOUNT_MODES[0], []);
+
+  assert.ok(cand);
+  assert.equal(cand.conformity.conforming, true); // Safe & compliant!
+  assert.equal(cand.conformity.safetyHeightOk, true);
+  assert.equal(cand.conformity.heightRangeOk, false); // But non-optimal performance!
 });

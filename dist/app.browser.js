@@ -1894,7 +1894,7 @@ function evaluateCustomCandidate(room, fanCount, diameter, mountMode, realDiamet
   }
 
   const recommendedSmallHeightMet = isSmall ? bladeHeight >= recommendedSmallHeight - EPS : true;
-  const conforming = wallClearanceOk && spacingOk && coverageOk && safetyHeightOk && heightRangeOk;
+  const conforming = wallClearanceOk && spacingOk && coverageOk && safetyHeightOk;
 
   // Calcul des diamètres réels compatibles pour information complémentaire
   const intervals = buildHeightFeasibility(room.height, mountMode.factor, coverageMinDiameter, Math.min(coverageMaxDiameter, cellShort / 2, spacings.length > 0 ? interFanSpacing / 2.5 : Number.POSITIVE_INFINITY));
@@ -1951,6 +1951,52 @@ function evaluateCustomCandidate(room, fanCount, diameter, mountMode, realDiamet
       heightRangeOk
     },
     strictAdvice: "Veuillez vérifier la conformité physique avec le fabricant de l'appareil choisi."
+  };
+}
+
+function findBestMarketAlternative(candidates) {
+  const compatible = candidates.filter((c) => c.compatibleRealDiameters?.length > 0);
+  if (compatible.length === 0) {
+    return null;
+  }
+
+  return [...compatible].sort((a, b) => {
+    const maxA = Math.max(...a.compatibleRealDiameters.map((d) => d.diameter));
+    const maxB = Math.max(...b.compatibleRealDiameters.map((d) => d.diameter));
+    if (Math.abs(maxA - maxB) > 1e-5) {
+      return maxB - maxA; // larger diameter first
+    }
+    if (a.fanCount !== b.fanCount) {
+      return a.fanCount - b.fanCount; // fewer fans first
+    }
+    return compareCandidates(a, b);
+  })[0];
+}
+
+function convertCandidateToMarketDiameter(candidate) {
+  if (!candidate.compatibleRealDiameters || candidate.compatibleRealDiameters.length === 0) {
+    return candidate;
+  }
+
+  const marketDiameter = Math.max(...candidate.compatibleRealDiameters.map((d) => d.diameter));
+  const cellArea = candidate.cellArea;
+  const coverageFactor = marketDiameter / Math.sqrt(cellArea);
+  const mountDistance = candidate.mountMode.factor * marketDiameter;
+  const bladeHeight = candidate.room.height - mountDistance;
+  const recommendedSmallHeight = 1.4 * marketDiameter;
+  const isSmall = marketDiameter < 2.13;
+  const recommendedSmallHeightMet = isSmall ? bladeHeight >= recommendedSmallHeight - 1e-9 : true;
+
+  return {
+    ...candidate,
+    diameter: marketDiameter,
+    coverageFactor,
+    mountDistance,
+    bladeHeight,
+    recommendedSmallHeight,
+    recommendedSmallHeightMet,
+    fanClass: isSmall ? "small" : "large",
+    isMarketAlternative: true
   };
 }
 
@@ -2707,38 +2753,57 @@ function candidateCard(candidate, rank, brasse2Models, realDiameters, selectedOp
       customAlertsHtml = `
         <div class="notice success" style="margin-bottom: 12px;">
           <strong>Calepinage conforme</strong>
-          Cette configuration respecte toutes les règles de hauteur, de distances et de couverture recommandées par le guide BRASSE.
+          Cette configuration respecte toutes les regles de securite et de distance reglementaires.
         </div>
       `;
+      if (!c.heightRangeOk) {
+        const range = candidate.diameter < 2.13 ? "inférieure à 2 D" : "comprise entre 0,8 D et 2 D";
+        customAlertsHtml += `
+          <div class="notice warning" style="margin-bottom: 12px;">
+            <strong>Hauteur de fonctionnement non optimale</strong> : la hauteur sous pales (${formatMeters(candidate.bladeHeight)}) doit être ${range} (${formatMeters(2 * candidate.diameter)} pour ce diametre) pour assurer un bon confort. Envisagez d'ajuster la longueur de la suspension (tige).
+          </div>
+        `;
+      }
     } else {
       badge = `<span class="badge danger">Non conforme</span>`;
       const alerts = [];
       if (!c.wallClearanceOk) {
-        alerts.push(`<strong>Distance aux murs insuffisante</strong> : le diamètre (${formatMeters(candidate.diameter)}) dépasse la distance entre le centre et le mur le plus proche (${formatMeters(candidate.wallClearance)}).`);
+        alerts.push(`<strong>Distance aux murs insuffisante</strong> : le diametre (${formatMeters(candidate.diameter)}) depasse la distance entre le centre et le mur le plus proche (${formatMeters(candidate.wallClearance)}).`);
       }
       if (!c.spacingOk) {
-        alerts.push(`<strong>Entraxe insuffisant</strong> : l'entraxe entre ventilateurs (${formatMeters(candidate.interFanSpacing)}) est inférieur à la limite réglementaire de 2.5 D (${formatMeters(2.5 * candidate.diameter)}).`);
+        alerts.push(`<strong>Entraxe insuffisant</strong> : l'entraxe entre ventilateurs (${formatMeters(candidate.interFanSpacing)}) est inferieur a la limite reglementaire de 2.5 D (${formatMeters(2.5 * candidate.diameter)}).`);
       }
       if (!c.coverageOk) {
-        alerts.push(`<strong>Facteur de couverture (FCC) non optimal</strong> : le FCC calculé (${formatFactor(candidate.coverageFactor)}) est en dehors de la plage réglementaire de [0,20 - 0,40].`);
+        alerts.push(`<strong>Facteur de couverture (FCC) non optimal</strong> : le FCC calcule (${formatFactor(candidate.coverageFactor)}) est en dehors de la plage reglementaire de [0,20 - 0,40].`);
       }
       if (!c.safetyHeightOk) {
         const limit = candidate.diameter < 2.13 ? "2,13 m" : "3,05 m";
-        alerts.push(`<strong>Hauteur de sécurité insuffisante</strong> : la hauteur sous pales (${formatMeters(candidate.bladeHeight)}) est inférieure au seuil de sécurité obligatoire pour cette classe d'appareil (${limit}).`);
-      }
-      if (!c.heightRangeOk) {
-        const range = candidate.diameter < 2.13 ? "inférieure à 2 D" : "comprise entre 0,8 D et 2 D";
-        alerts.push(`<strong>Hauteur de fonctionnement non optimale</strong> : la hauteur sous pales (${formatMeters(candidate.bladeHeight)}) doit être ${range} pour assurer un bon confort.`);
+        alerts.push(`<strong>Hauteur de securite insuffisante</strong> : la hauteur sous pales (${formatMeters(candidate.bladeHeight)}) est inferieure au seuil de securite obligatoire pour cette classe d'appareil (${limit}).`);
       }
       customAlertsHtml = `
         <div class="notice danger" style="margin-bottom: 12px;">
-          <strong>Détail des non-conformités :</strong>
+          <strong>Detail des non-conformites :</strong>
           <ul style="margin: 8px 0 0; padding-left: 18px;">
             ${alerts.map((a) => `<li style="margin-bottom: 4px;">${a}</li>`).join("")}
           </ul>
         </div>
       `;
+      if (!c.heightRangeOk) {
+        const range = candidate.diameter < 2.13 ? "inférieure à 2 D" : "comprise entre 0,8 D et 2 D";
+        customAlertsHtml += `
+          <div class="notice warning" style="margin-bottom: 12px;">
+            <strong>Hauteur de fonctionnement non optimale</strong> : la hauteur sous pales (${formatMeters(candidate.bladeHeight)}) doit être ${range} (${formatMeters(2 * candidate.diameter)} pour ce diametre) pour assurer un bon confort. Envisagez d'ajuster la longueur de la suspension (tige).
+          </div>
+        `;
+      }
     }
+  } else if (candidate.isMarketAlternative) {
+    badge = "";
+    customAlertsHtml = `
+      <div class="notice success" style="margin-bottom: 12px;">
+        Le diametre choisi est compris dans les diametres courants.
+      </div>
+    `;
   }
 
   return `
@@ -3092,9 +3157,12 @@ function renderSelectedOptionsOverview(state, selectedOptions) {
 function renderUniformityOptionPage(state, option) {
   const optionNumber = getReportOptionNumber(state, option);
   const kicker = option.isCustom ? "Configuration personnalisee" : `Option ${optionNumber}`;
-  const sub = option.isCustom
-    ? `${option.fanCount} brasseur${option.fanCount > 1 ? "s" : ""} • ${option.mountMode.label} • ${option.conformity.conforming ? "CONFORME" : "NON CONFORME"}`
-    : `${option.fanCount} brasseur${option.fanCount > 1 ? "s" : ""} • ${option.mountMode.label}`;
+  let sub = `${option.fanCount} brasseur${option.fanCount > 1 ? "s" : ""} • ${option.mountMode.label}`;
+  if (option.isCustom) {
+    sub = `${option.fanCount} brasseur${option.fanCount > 1 ? "s" : ""} • ${option.mountMode.label} • ${option.conformity.conforming ? "CONFORME" : "NON CONFORME"}`;
+  } else if (option.isMarketAlternative) {
+    sub = `${option.fanCount} brasseur${option.fanCount > 1 ? "s" : ""} • ${option.mountMode.label}`;
+  }
 
   const customAlerts = [];
   if (option.isCustom) {
@@ -3114,6 +3182,8 @@ function renderUniformityOptionPage(state, option) {
     if (!c.heightRangeOk) {
       customAlerts.push(`Hauteur de fonctionnement non optimale (${formatMeters(option.bladeHeight)})`);
     }
+  } else if (option.isMarketAlternative) {
+    customAlerts.push("Le diametre choisi est compris dans les diametres courants.");
   }
 
   const allWarnings = [...customAlerts, ...getCandidateWarnings(option)];
@@ -3760,6 +3830,25 @@ function render() {
 
   const modes = getSelectedModes();
   const candidates = enumerateCandidates(room, MAX_GRID_FANS, modes, realDiameters);
+
+  if (candidates.length > 0) {
+    let bestMarket = findBestMarketAlternative(candidates);
+    if (bestMarket) {
+      bestMarket = convertCandidateToMarketDiameter(bestMarket);
+      const top5 = candidates.slice(0, 5);
+      const idx = top5.findIndex((c) => c.key === bestMarket.key);
+      if (idx >= 0) {
+        candidates[idx] = bestMarket;
+      } else {
+        if (candidates.length >= 5) {
+          candidates[4] = bestMarket;
+        } else {
+          candidates.push(bestMarket);
+        }
+      }
+    }
+  }
+
   const fallbackFlush =
     candidates.length === 0 ? getFallbackFlushCandidate(room, MAX_GRID_FANS, realDiameters) : null;
 

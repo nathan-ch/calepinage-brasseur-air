@@ -41,6 +41,39 @@ test("les modeles BRASSE II compatibles sont derives de l'option de calepinage",
   assert.ok(buildModelPicks(models).length > 0);
 });
 
+test("brasse2 - enrich models verification details", () => {
+  const room = { length: 9, width: 5, height: 2.75 };
+  const candidates = enumerateCandidates(room, MAX_GRID_FANS, MOUNT_MODES, realDiameters);
+  const candidate = candidates[0]; // e.g. 1x1-low-profile
+
+  const enriched = getBrasse2ModelsForCandidate(candidate, BRASSE2_MODELS);
+  const model = enriched[0];
+
+  assert.ok(Number.isFinite(model.sizing.diameter));
+  assert.ok(Number.isFinite(model.sizing.coverageFactor));
+  assert.ok(typeof model.sizing.coverageValid === "boolean");
+  assert.ok(typeof model.sizing.sizeFits === "boolean");
+  assert.ok(typeof model.mountFits === "boolean");
+  assert.ok(Number.isFinite(model.mountDeltaCm));
+});
+
+test("brasse2 - buildModelPicks details", () => {
+  const emptyPicks = buildModelPicks([]);
+  assert.equal(emptyPicks.length, 0);
+
+  // Test catalog models picks selection
+  const room = { length: 9, width: 5, height: 2.75 };
+  const candidates = enumerateCandidates(room, MAX_GRID_FANS, MOUNT_MODES, realDiameters);
+  const models = getBrasse2ModelsForCandidate(candidates[0], BRASSE2_MODELS);
+
+  const picks = buildModelPicks(models);
+  assert.ok(picks.length > 0);
+  assert.ok(picks.some((p) => p.title === "FCC"));
+  assert.ok(picks.some((p) => p.title === "Confort"));
+  assert.ok(picks.some((p) => p.title === "Efficacite"));
+  assert.ok(picks.some((p) => p.title === "Acoustique"));
+});
+
 test("la selection d'options PDF ne conserve que les options cochees", () => {
   const room = { length: 9, width: 5, height: 2.75 };
   const candidates = enumerateCandidates(room, MAX_GRID_FANS, MOUNT_MODES, realDiameters).slice(0, 3);
@@ -79,4 +112,20 @@ test("le rapport PDF n'inclut que les options selectionnees", () => {
   assert.match(reportHtml, /Option 2/);
   assert.doesNotMatch(reportHtml, /Option 1<\/td>/);
   assert.doesNotMatch(reportHtml, /Option 3<\/td>/);
+});
+
+test("le rapport PDF genere un rapport vide/invalide", () => {
+  const room = { length: 5, width: 5, height: 2.0 }; // Too low ceiling
+  const reportState = {
+    kind: "uniformity-empty",
+    simulationName: "Rapport vide test",
+    room,
+    modesLabel: "Montage standard",
+    generatedAt: new Date("2026-04-22T09:00:00Z"),
+    issues: ["Aucun calepinage théorique possible."]
+  };
+
+  const reportHtml = buildPdfReportDocument(reportState, BRASSE2_MODELS);
+  assert.match(reportHtml, /Aucune solution compatible/);
+  assert.match(reportHtml, /Aucun calepinage th/);
 });

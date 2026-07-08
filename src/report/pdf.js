@@ -5,12 +5,10 @@ import {
 import {
   escapeHtml,
   formatDateTime,
-  formatDb,
+  formatDiameterCm,
   formatFactor,
   formatMeters,
-  formatNumber,
-  formatSquareMeters,
-  formatTemp
+  formatSquareMeters
 } from "../core/formatters.js";
 import {
   svgForCandidate
@@ -195,7 +193,6 @@ function renderUniformityOptionPage(state, option) {
 
       ${renderReportMetricGrid([
         ["Diametre theorique recommande", formatMeters(option.diameter)],
-        ["Diametre theorique max", formatMeters(option.theoreticalMaxDiameter)],
         ["Facteur de forme", formatFactor(option.formFactor)],
         ["FCC calc.", formatFactor(option.coverageFactor)],
         ["Hauteur sous pales", formatMeters(option.bladeHeight)],
@@ -516,7 +513,7 @@ export function buildPdfFilename(simulationName) {
   return `${base || "simulation"}-${stamp}`;
 }
 
-export function buildPdfReportDocument(state, brasse2Models) {
+export function buildPdfReportDocument(state, _brasse2Models) {
   if (!state) {
     return "";
   }

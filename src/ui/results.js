@@ -161,10 +161,6 @@ function renderExportOptionToggle(optionKey, checked) {
   `;
 }
 
-function renderModelCard(title, model) {
-  return "";
-}
-
 function renderModelsTable(models) {
   if (models.length === 0) {
     return `
@@ -312,7 +308,7 @@ export function resetResultsModelSections() {
   nextModelSectionId = 1;
 }
 
-function renderBrasse2Section(candidate, brasse2Models, realDiameters) {
+function renderBrasse2Section(candidate, brasse2Models, _realDiameters) {
   const models = getBrasse2ModelsForCandidate(candidate, brasse2Models);
   const filteredModels = models.filter((model) => model?.sizing?.sizeFits);
 
@@ -374,10 +370,6 @@ function candidateCard(candidate, rank, brasse2Models, realDiameters, selectedOp
             <div class="metric-card">
               <strong>Diametre theorique recommande</strong>
               <span>${formatMeters(candidate.diameter)}</span>
-            </div>
-            <div class="metric-card">
-              <strong>Diametre theorique max</strong>
-              <span>${formatMeters(candidate.theoreticalMaxDiameter)}</span>
             </div>
             <div class="metric-card">
               <strong>Facteur de forme</strong>

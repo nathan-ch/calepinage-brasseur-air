@@ -37,7 +37,7 @@ test("les modeles BRASSE II compatibles sont derives de l'option de calepinage",
   const models = getBrasse2ModelsForCandidate(candidates[0], BRASSE2_MODELS);
 
   assert.ok(models.length > 0);
-  assert.ok(models.some((model) => model.isSelectedDiameter));
+  assert.ok(models.some((model) => model.sizing?.sizeFits));
   assert.ok(buildModelPicks(models).length > 0);
 });
 

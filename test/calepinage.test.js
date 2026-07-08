@@ -10,12 +10,12 @@ const realDiameters = [
   ...new Set(BRASSE2_MODELS.map((model) => Number(model.diameterCm) / 100))
 ].sort((a, b) => a - b);
 
-test("le cas 9 x 5 x 2,75 priorise bien 2x1 standard avant low-profile", () => {
+test("le cas 9 x 5 x 2,75 priorise bien 1x1 low-profile avant 2x1 low-profile", () => {
   const room = { length: 9, width: 5, height: 2.75 };
   const candidates = enumerateCandidates(room, MAX_GRID_FANS, MOUNT_MODES, realDiameters);
 
   assert.ok(candidates.length > 0);
-  assert.equal(candidates[0].key, "2x1-standard");
+  assert.equal(candidates[0].key, "1x1-low-profile");
   assert.equal(candidates[1].key, "2x1-low-profile");
 });
 
@@ -23,7 +23,8 @@ test("le message de hauteur explicite la limite BRASSE II a 4 m de HSP", () => {
   const room = { length: 9, width: 5, height: 4 };
   const candidates = enumerateCandidates(room, MAX_GRID_FANS, MOUNT_MODES, realDiameters);
 
-  assert.equal(candidates.length, 0);
+  assert.ok(candidates.length > 0);
+  assert.ok(candidates.every((c) => c.compatibleRealDiameters.length === 0));
 
   const message = buildHeightDiameterRequirementMessage(room, MOUNT_MODES, realDiameters);
   assert.match(message, /162 cm/);

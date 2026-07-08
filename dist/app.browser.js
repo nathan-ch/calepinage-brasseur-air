@@ -1374,30 +1374,31 @@ function getCandidateWarnings(candidate) {
 
 // src/core/brasse2.js
 /**
- * Retourne tous les modeles BRASSE II compatibles avec les diametres admissibles
- * d'une option de calepinage.
+ * Enrichit les modeles BRASSE II avec des indicateurs de compatibilite pour une
+ * option (dimensionnement theorique, montage, FCC derive).
  */
 function getBrasse2ModelsForCandidate(candidate, brasse2Models) {
-  const optionsByDiameterCm = new Map(
-    candidate.compatibleRealDiameters.map((option) => [Math.round(option.diameter * 100), option])
-  );
+  const maxDiameterCm = Math.round(candidate.theoreticalMaxDiameter * 100);
 
-  return brasse2Models
-    .filter((model) => optionsByDiameterCm.has(model.diameterCm))
-    .map((model) => ({
+  return brasse2Models.map((model) => {
+    const modelDiameter = model.diameterCm / 100;
+    const coverageFactor = getCoverageFactorForDiameter(candidate.cellArea, modelDiameter);
+    const coverageValid = isCoverageFactorValid(coverageFactor);
+    const sizeFits = model.diameterCm <= maxDiameterCm + 0.5;
+    const targetCeilingDistanceCm = candidate.mountMode.factor * modelDiameter * 100;
+
+    return {
       ...model,
-      compatibleOption: optionsByDiameterCm.get(model.diameterCm),
-      mountFits:
-        model.ceilingDistanceCm <=
-        candidate.mountMode.factor * optionsByDiameterCm.get(model.diameterCm).diameter * 100 + 0.5,
-      mountDeltaCm: Number(
-        (
-          candidate.mountMode.factor * optionsByDiameterCm.get(model.diameterCm).diameter * 100 -
-          model.ceilingDistanceCm
-        ).toFixed(1)
-      ),
-      isSelectedDiameter: Math.abs(model.diameterCm - Math.round(candidate.diameter * 100)) <= 0.5
-    }));
+      sizing: {
+        diameter: modelDiameter,
+        coverageFactor,
+        coverageValid,
+        sizeFits
+      },
+      mountFits: model.ceilingDistanceCm <= targetCeilingDistanceCm + 0.5,
+      mountDeltaCm: Number((targetCeilingDistanceCm - model.ceilingDistanceCm).toFixed(1))
+    };
+  });
 }
 
 function pickBestModel(models, comparator) {
@@ -1435,12 +1436,8 @@ function compareAcoustics(a, b) {
 }
 
 function compareCoverage(a, b) {
-  const coverageA = Number.isFinite(a.compatibleOption?.coverageFactor)
-    ? a.compatibleOption.coverageFactor
-    : -Infinity;
-  const coverageB = Number.isFinite(b.compatibleOption?.coverageFactor)
-    ? b.compatibleOption.coverageFactor
-    : -Infinity;
+  const coverageA = Number.isFinite(a.sizing?.coverageFactor) ? a.sizing.coverageFactor : -Infinity;
+  const coverageB = Number.isFinite(b.sizing?.coverageFactor) ? b.sizing.coverageFactor : -Infinity;
 
   if (Math.abs(coverageB - coverageA) > EPS) {
     return coverageB - coverageA;
@@ -1694,19 +1691,19 @@ function evaluateCandidate(room, nx, ny, mountMode, realDiameters) {
     null
   );
   const theoreticalMaxDiameter = bestInterval.upper;
-  const compatibleRealDiameters = getCompatibleRealDiameters(realDiameters, intervals, cellArea);
-  if (compatibleRealDiameters.length === 0) {
-    return null;
-  }
+  const compatibleRealDiameters = Array.isArray(realDiameters)
+    ? getCompatibleRealDiameters(realDiameters, intervals, cellArea)
+    : [];
 
-  const selectedRealDiameter = compatibleRealDiameters[compatibleRealDiameters.length - 1];
-  const diameter = selectedRealDiameter.diameter;
+  // Le dimensionnement retourne un diamètre théorique recommandé indépendant d'une liste de modèles.
+  // La sélection d'un modèle réel (et donc d'un diamètre nominal) est laissée à l'utilisateur.
+  const diameter = theoreticalMaxDiameter;
   const mountDistance = mountMode.factor * diameter;
   const bladeHeight = room.height - mountDistance;
-  const coverageFactor = selectedRealDiameter.coverageFactor;
+  const coverageFactor = getCoverageFactorForDiameter(cellArea, diameter);
   const recommendedSmallHeight = 1.4 * diameter;
   const recommendedSmallHeightMet =
-    selectedRealDiameter.fanClass === "small"
+    bestInterval.fanClass === "small"
       ? bladeHeight >= recommendedSmallHeight - EPS
       : true;
 
@@ -1750,7 +1747,7 @@ function evaluateCandidate(room, nx, ny, mountMode, realDiameters) {
     },
     compatibleRealDiameters,
     coordinates,
-    fanClass: selectedRealDiameter.fanClass,
+    fanClass: bestInterval.fanClass,
     strictAdvice:
       "Verifier la fiche du modele retenu si son diametre nominal est proche d'une limite geometrique ou d'une limite de hauteur du guide."
   };
@@ -2248,11 +2245,14 @@ function registerModelSection(models) {
 }
 
 function getDefaultCompatibleModelsComparator(a, b) {
-  if (a.isSelectedDiameter !== b.isSelectedDiameter) {
-    return a.isSelectedDiameter ? -1 : 1;
+  if (Boolean(a.sizing?.sizeFits) !== Boolean(b.sizing?.sizeFits)) {
+    return a.sizing?.sizeFits ? -1 : 1;
   }
-  if (Math.abs(b.compatibleOption.diameter - a.compatibleOption.diameter) > EPS) {
-    return b.compatibleOption.diameter - a.compatibleOption.diameter;
+  if (Boolean(a.sizing?.coverageValid) !== Boolean(b.sizing?.coverageValid)) {
+    return a.sizing?.coverageValid ? -1 : 1;
+  }
+  if (Math.abs((b.sizing?.coverageFactor ?? -Infinity) - (a.sizing?.coverageFactor ?? -Infinity)) > EPS) {
+    return (b.sizing?.coverageFactor ?? -Infinity) - (a.sizing?.coverageFactor ?? -Infinity);
   }
   return compareComfort(a, b);
 }
@@ -2343,7 +2343,9 @@ function getDistinctCompatibleModels(items, brasse2Models) {
 
   items.forEach((item) => {
     getBrasse2ModelsForCandidate(item, brasse2Models).forEach((model) => {
-      modelsById.set(model.id, model);
+      if (model?.sizing?.sizeFits && model?.sizing?.coverageValid) {
+        modelsById.set(model.id, model);
+      }
     });
   });
 
@@ -2369,28 +2371,6 @@ function renderExportOptionToggle(optionKey, checked) {
   `;
 }
 
-function renderModelCard(title, model) {
-  if (!model) {
-    return "";
-  }
-  const hasCoverageFactor = Number.isFinite(model.compatibleOption.coverageFactor);
-
-  return `
-    <article class="model-card">
-      <strong>${title}</strong>
-      <h4>${model.brand} - ${model.model}</h4>
-      <p>${model.motor} • ${model.fixation} • ${model.diameterCm} cm${model.isSelectedDiameter ? " • diametre retenu" : ""}</p>
-      <div class="model-stats">
-        <span>${hasCoverageFactor ? `FCC reel du calepinage: ${formatFactor(model.compatibleOption.coverageFactor)}` : `Diametre BRASSE II compatible: ${model.diameterCm} cm`}</span>
-        <span>CE direct debout Vmax: ${formatTemp(model.ceDirDeboutMax)}</span>
-        <span>CFE direct debout Vmax: ${formatNumber(model.cfeDirDeboutMax, 4)} °C/W</span>
-        <span>LwA Vmax: ${formatDb(model.lwaMaxDbA)}</span>
-        <span>${modelMountLabel(model)} (${formatNumber(model.ceilingDistanceCm, 1)} cm de base)</span>
-      </div>
-    </article>
-  `;
-}
-
 function renderModelsTable(models) {
   if (models.length === 0) {
     return `
@@ -2407,7 +2387,9 @@ function renderModelsTable(models) {
         <thead>
           <tr>
             <th>Diam.</th>
-            <th>FCC reel</th>
+            <th>FCC calc.</th>
+            <th>OK dim.</th>
+            <th>OK FCC</th>
             <th>Marque</th>
             <th>Modele</th>
             <th>Moteur</th>
@@ -2426,7 +2408,9 @@ function renderModelsTable(models) {
               (model) => `
                 <tr>
                   <td>${model.diameterCm}</td>
-                  <td>${Number.isFinite(model.compatibleOption.coverageFactor) ? formatFactor(model.compatibleOption.coverageFactor) : "—"}</td>
+                  <td>${Number.isFinite(model.sizing?.coverageFactor) ? formatFactor(model.sizing.coverageFactor) : "—"}</td>
+                  <td>${model.sizing?.sizeFits ? "Oui" : "Non"}</td>
+                  <td>${model.sizing?.coverageValid ? "Oui" : "Non"}</td>
                   <td>${model.brand}</td>
                   <td>${model.model}</td>
                   <td>${model.motor}</td>
@@ -2534,47 +2518,37 @@ function resetResultsModelSections() {
   nextModelSectionId = 1;
 }
 
-function renderBrasse2Section(candidate, brasse2Models, realDiameters) {
+function renderBrasse2Section(candidate, brasse2Models, _realDiameters) {
   const models = getBrasse2ModelsForCandidate(candidate, brasse2Models);
+  const filteredModels = models.filter((model) => model?.sizing?.sizeFits);
 
-  if (models.length === 0) {
+  if (filteredModels.length === 0) {
     return `
       <section class="models-shell">
         <div>
-          <h4 class="section-title">Modeles pré-sélectionnés</h4>
+          <h4 class="section-title">Catalogue BRASSE II</h4>
           <p class="section-subtitle" style="margin-bottom:0;">
-            Filtrage sur les diametres BRASSE II admissibles pour ce calepinage.
+            Aucun modele du catalogue n'entre dans le diametre theorique recommande pour cette option.
           </p>
-        </div>
-        <div class="notice warning">
-          <strong>Aucun modele BRASSE II compatible.</strong>
-          La base embarquee couvre ici les diametres disponibles dans BRASSE II :
-          <code>${formatDiameterList(realDiameters)}</code>.
         </div>
       </section>
     `;
   }
 
-  const sectionId = registerModelSection(models);
-  const modelPicks = buildModelPicks(models);
+  const sectionId = registerModelSection(filteredModels);
 
   return `
     <section class="models-shell">
       <div>
-        <h4 class="section-title">Modeles pré-sélectionnés</h4>
+        <h4 class="section-title">Choisir un modele (catalogue BRASSE II)</h4>
         <p class="section-subtitle" style="margin-bottom:0;">
-          Filtrage sur tous les diametres admissibles. Les cartes ci-dessous lisent le meilleur FCC du calepinage,
-          puis les indicateurs BRASSE a Vmax : confort direct debout, efficacite directe debout et acoustique.
+          Liste de modeles a comparer. Le dimensionnement ci-dessus est theorique ; choisissez ensuite un modele adapte.
         </p>
       </div>
 
-      <div class="models-grid">
-        ${modelPicks.map((pick) => renderModelCard(pick.title, pick.model)).join("")}
-      </div>
-
       <details class="models-details">
-        <summary>Voir tous les modeles BRASSE II compatibles (${models.length})</summary>
-        ${renderModelsTablePanel(sectionId, models)}
+        <summary>Voir les modeles du catalogue dans le diametre theorique (${filteredModels.length})</summary>
+        ${renderModelsTablePanel(sectionId, filteredModels)}
       </details>
     </section>
   `;
@@ -2592,7 +2566,7 @@ function candidateCard(candidate, rank, brasse2Models, realDiameters, selectedOp
           <p class="result-subtitle">
             ${candidate.fanCount} brasseur${candidate.fanCount > 1 ? "s" : ""} centre${candidate.fanCount > 1 ? "s" : ""}
             dans des cellules de ${formatMeters(candidate.cellLength)} × ${formatMeters(candidate.cellWidth)},
-            avec un diametre BRASSE II retenu de ${formatMeters(candidate.diameter)}.
+            avec un diametre theorique recommande de ${formatMeters(candidate.diameter)}.
           </p>
         </div>
         ${renderExportOptionToggle(candidate.key, isSelectedForExport)}
@@ -2604,12 +2578,8 @@ function candidateCard(candidate, rank, brasse2Models, realDiameters, selectedOp
         <div class="stack">
           <div class="metric-grid">
             <div class="metric-card">
-              <strong>Diametre réel retenu</strong>
+              <strong>Diametre theorique recommande</strong>
               <span>${formatMeters(candidate.diameter)}</span>
-            </div>
-            <div class="metric-card">
-              <strong>Diametre theorique max</strong>
-              <span>${formatMeters(candidate.theoreticalMaxDiameter)}</span>
             </div>
             <div class="metric-card">
               <strong>Facteur de forme</strong>
@@ -2642,8 +2612,12 @@ function candidateCard(candidate, rank, brasse2Models, realDiameters, selectedOp
               <span>${candidate.interFanSpacing ? `${formatMeters(candidate.interFanSpacing)} &gt; ${formatNumber(2.5, 1)} × D` : "Non applicable (un seul brasseur)"}</span>
             </div>
             <div class="detail-item detail-item-stack">
-              <strong>Diametres BRASSE II admissibles (FCC &gt;= 0,2)</strong>
-              <span>${candidate.compatibleRealDiameters.map((option) => formatDiameterCm(option.diameter)).join(", ")}</span>
+              <strong>Diametres BRASSE II admissibles (info)</strong>
+              <span>${
+                candidate.compatibleRealDiameters?.length
+                  ? candidate.compatibleRealDiameters.map((option) => formatDiameterCm(option.diameter)).join(", ")
+                  : "Aucun diametre de la liste de reference"
+              }</span>
             </div>
           </div>
         </div>
@@ -2686,11 +2660,9 @@ function renderSummary(dom, room, candidates, brasse2Models) {
       diameterSummary.detail
     ),
     createSummaryCard(
-      "Base BRASSE II",
-      compatibleModels.length > 0
-        ? `${compatibleModels.length} modeles`
-        : "Aucun modele compatible",
-      "Compatibles avec les options affichees"
+      "Catalogue BRASSE II",
+      compatibleModels.length > 0 ? `${compatibleModels.length} modeles compatibles` : "Aucun modele compatible",
+      "Compatibilite calculee sur les options affichees"
     )
   ].join("");
   dom.highlights.innerHTML = "";
@@ -2714,7 +2686,17 @@ function renderStatusNote(
         <div class="notice warning">
           <strong>Le meilleur cas passe en low-profile.</strong>
           Le guide indique alors une baisse de vitesse d'air d'environ 15 %. Une variante standard est egalement
-          affichee plus bas si elle existe. Le diametre retenu est choisi ici parmi les diametres reels disponibles.
+          affichee plus bas si elle existe.
+        </div>
+      `);
+    }
+
+    if (candidates.every((c) => c.compatibleRealDiameters.length === 0)) {
+      notes.push(`
+        <div class="notice warning">
+          <strong>Aucun modèle compatible disponible dans le catalogue.</strong>
+          Les configurations théoriques proposées nécessitent des diamètres supérieurs à la limite du catalogue BRASSE II embarqué (${formatMeters(realDiameters[realDiameters.length - 1])}).
+          ${heightRequirementMessage}
         </div>
       `);
     }
@@ -2734,9 +2716,8 @@ function renderStatusNote(
   if (!fallbackFlush && candidates.length === 0) {
     notes.push(`
       <div class="notice danger">
-        <strong>Aucun diametre réel de la liste testée ne passe dans ce local.</strong>
-        L'outil a teste ${formatDiameterList(realDiameters)} avec les regles BRASSE
-        de FCC, de distances et de hauteur.
+        <strong>Aucun calepinage théorique standard ou low-profile n'est possible dans ce local.</strong>
+        Le local ne permet pas d'implanter de brasseur d'air respectant les règles BRASSE de FCC, de distances et de hauteur.
         ${heightRequirementMessage}
       </div>
     `);
@@ -2772,18 +2753,6 @@ function getAllReportOptions(state) {
 function getReportOptionNumber(state, option) {
   const index = getAllReportOptions(state).findIndex((item) => item.key === option.key);
   return index >= 0 ? index + 1 : null;
-}
-
-function getDistinctCompatibleModels(options, brasse2Models) {
-  const modelsById = new Map();
-
-  options.forEach((option) => {
-    getBrasse2ModelsForCandidate(option, brasse2Models).forEach((model) => {
-      modelsById.set(model.id, model);
-    });
-  });
-
-  return [...modelsById.values()];
 }
 
 function getMaxDiameterSummary(options) {
@@ -2876,44 +2845,8 @@ function renderReportTable(headers, rows, compact = false) {
   `;
 }
 
-function renderModelHighlights(option, brasse2Models) {
-  const highlights = getReportModelHighlights(option, brasse2Models);
-  if (highlights.length === 0) {
-    return `
-      <div class="report-note">
-        <strong>Modeles pre-selectionnes</strong>
-        <p>Aucun modele compatible dans la base BRASSE II embarquee sur les diametres admissibles de cette option.</p>
-      </div>
-    `;
-  }
-
-  const rows = highlights.map((entry) => [
-    entry.title,
-    `${entry.model.brand} ${entry.model.model}`,
-    `${entry.model.diameterCm} cm`,
-    Number.isFinite(entry.model.compatibleOption.coverageFactor)
-      ? formatFactor(entry.model.compatibleOption.coverageFactor)
-      : "—",
-    formatTemp(entry.model.ceDirDeboutMax),
-    `${formatNumber(entry.model.cfeDirDeboutMax, 4)} °C/W`,
-    formatDb(entry.model.lwaMaxDbA)
-  ]);
-
-  return `
-    <section class="report-section">
-      <h3>Modeles pre-selectionnes</h3>
-      ${renderReportTable(
-        ["Lecture", "Marque / modele", "Diam.", "FCC", "CE dir.", "CFE dir.", "LwA"],
-        rows,
-        true
-      )}
-    </section>
-  `;
-}
-
-function renderStudySummarySection(state, selectedOptions, brasse2Models) {
+function renderStudySummarySection(state, selectedOptions) {
   const roomArea = state.room.length * state.room.width;
-  const compatibleModels = getDistinctCompatibleModels(selectedOptions, brasse2Models);
   const maxDiameterSummary = getMaxDiameterSummary(selectedOptions);
   const baseCards = [
     [
@@ -2925,11 +2858,6 @@ function renderStudySummarySection(state, selectedOptions, brasse2Models) {
       "Diametre max",
       maxDiameterSummary.value,
       maxDiameterSummary.detail
-    ],
-    [
-      "Base BRASSE II",
-      compatibleModels.length > 0 ? `${compatibleModels.length} modeles` : "Aucun modele",
-      "Compatibles avec les options exportees"
     ]
   ];
 
@@ -2967,7 +2895,7 @@ function renderSelectedOptionsOverview(state, selectedOptions) {
       <section class="report-block">
         <h2>Synthese de ou des option(s) retenue(s) :</h2>
         ${renderReportTable(
-          ["Option", "Trame", "Diametre reel", "Montage", "FCC reel"],
+          ["Option", "Trame", "Diametre theorique", "Montage", "FCC calc."],
           rows,
           true
         )}
@@ -2976,7 +2904,7 @@ function renderSelectedOptionsOverview(state, selectedOptions) {
   }
 }
 
-function renderUniformityOptionPage(state, option, brasse2Models) {
+function renderUniformityOptionPage(state, option) {
   const optionNumber = getReportOptionNumber(state, option);
 
   return `
@@ -2988,10 +2916,9 @@ function renderUniformityOptionPage(state, option, brasse2Models) {
       </div>
 
       ${renderReportMetricGrid([
-        ["Diametre reel retenu", formatMeters(option.diameter)],
-        ["Diametre theorique max", formatMeters(option.theoreticalMaxDiameter)],
+        ["Diametre theorique recommande", formatMeters(option.diameter)],
         ["Facteur de forme", formatFactor(option.formFactor)],
-        ["FCC reel", formatFactor(option.coverageFactor)],
+        ["FCC calc.", formatFactor(option.coverageFactor)],
         ["Hauteur sous pales", formatMeters(option.bladeHeight)],
         ["Plafond-pales", formatMeters(option.mountDistance)]
       ])}
@@ -3010,21 +2937,18 @@ function renderUniformityOptionPage(state, option, brasse2Models) {
                 option.interFanSpacing
                   ? `${formatMeters(option.interFanSpacing)} > 2,5 × D`
                   : "Non applicable"
-              ],
-              ["Diametres admissibles", formatDiameterCmList(option.compatibleRealDiameters)]
+              ]
             ],
             true
           )}
           ${renderReportWarningList(getCandidateWarnings(option))}
         </div>
       </div>
-
-      ${renderModelHighlights(option, brasse2Models)}
     </section>
   `;
 }
 
-function renderReportFirstPage(state, selectedOptions, brasse2Models) {
+function renderReportFirstPage(state, selectedOptions) {
   return `
     <section class="report-page report-first-page">
       <header class="report-cover">
@@ -3037,7 +2961,7 @@ function renderReportFirstPage(state, selectedOptions, brasse2Models) {
         </p>
       </header>
 
-      ${renderStudySummarySection(state, selectedOptions, brasse2Models)}
+      ${renderStudySummarySection(state, selectedOptions)}
       ${renderSelectedOptionsOverview(state, selectedOptions)}
     </section>
   `;
@@ -3313,7 +3237,7 @@ function buildPdfFilename(simulationName) {
   return `${base || "simulation"}-${stamp}`;
 }
 
-function buildPdfReportDocument(state, brasse2Models) {
+function buildPdfReportDocument(state, _brasse2Models) {
   if (!state) {
     return "";
   }
@@ -3323,9 +3247,9 @@ function buildPdfReportDocument(state, brasse2Models) {
 
   if (state.kind === "uniformity-ok") {
     bodyContent = `
-      ${renderReportFirstPage(state, selectedOptions, brasse2Models)}
+      ${renderReportFirstPage(state, selectedOptions)}
       ${selectedOptions
-        .map((option) => renderUniformityOptionPage(state, option, brasse2Models))
+        .map((option) => renderUniformityOptionPage(state, option))
         .join("")}
     `;
   } else {

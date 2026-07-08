@@ -8,10 +8,11 @@ import {
   setLatestReportState,
   toggleLatestReportOptionSelection
 } from "./app/state.js";
-import { MAX_GRID_FANS, MOUNT_MODES } from "./core/constants.js";
+import { MAX_GRID_FANS, MOUNT_MODES, FLUSH_MODE } from "./core/constants.js";
 import {
   enumerateCandidates,
-  getFallbackFlushCandidate
+  getFallbackFlushCandidate,
+  evaluateCustomCandidate
 } from "./core/calepinage.js";
 import { parseNumber, formatMeters } from "./core/formatters.js";
 import { buildHeightDiameterRequirementMessage } from "./core/messages.js";
@@ -96,8 +97,16 @@ function validateInputs(values) {
   if (!(values.height > 0)) {
     issues.push("La hauteur sous plafond doit etre strictement positive.");
   }
-  if (!dom.allowStandardInput.checked && !dom.allowLowInput.checked) {
-    issues.push("Selectionnez au moins un type de montage.");
+
+  if (state.mode === "auto") {
+    if (!dom.allowStandardInput.checked && !dom.allowLowInput.checked) {
+      issues.push("Selectionnez au moins un type de montage.");
+    }
+  } else {
+    const diameter = parseNumber(dom.manualDiameterInput);
+    if (!(diameter > 0)) {
+      issues.push("Le diametre du brasseur doit etre strictement positif.");
+    }
   }
   return issues;
 }
@@ -218,6 +227,50 @@ function render() {
     width: rawValues.width,
     height: rawValues.height
   };
+
+  if (state.mode === "manual") {
+    const diameter = parseNumber(dom.manualDiameterInput);
+    const fanCount = Number(dom.fanCountSelect.value);
+    const mountModeId = dom.manualMountSelect.value;
+    let mountMode = MOUNT_MODES.find((m) => m.id === mountModeId);
+    if (!mountMode && mountModeId === "flush") {
+      mountMode = FLUSH_MODE;
+    }
+
+    const candidate = evaluateCustomCandidate(room, fanCount, diameter, mountMode, realDiameters);
+    const recommendation = `Configuration personnalisee : ${candidate.nx} × ${candidate.ny} - ${candidate.fanCount} brasseur${candidate.fanCount > 1 ? "s" : ""} (${candidate.conformity.conforming ? "conforme" : "non conforme"})`;
+
+    updateHeader({
+      room,
+      recommendation,
+      generatedAt
+    });
+
+    setLatestReportState(state, {
+      kind: "uniformity-ok",
+      simulationName: getSimulationName(),
+      room,
+      candidates: [candidate],
+      selectedOptionKeys: createSelectedReportOptionKeys([candidate]),
+      modesLabel: candidate.mountMode.label,
+      generatedAt,
+      context: `Configuration personnalisee • trame : ${candidate.nx} × ${candidate.ny}`
+    });
+
+    renderSummary(dom, room, [candidate], brasse2Models);
+    dom.statusNote.innerHTML = "";
+    renderResults(
+      dom,
+      [candidate],
+      brasse2Models,
+      realDiameters,
+      state.latestReportState?.selectedOptionKeys || []
+    );
+    updateExportControls();
+    dom.resultsContent.classList.remove("hidden");
+    return;
+  }
+
   const modes = getSelectedModes();
   const candidates = enumerateCandidates(room, MAX_GRID_FANS, modes, realDiameters);
   const fallbackFlush =
@@ -261,6 +314,29 @@ dom.form.addEventListener("submit", (event) => {
   render();
 });
 
+function switchTab(mode) {
+  if (state.mode === mode) {
+    return;
+  }
+  state.mode = mode;
+
+  if (mode === "auto") {
+    dom.tabAuto.classList.add("active");
+    dom.tabManual.classList.remove("active");
+    dom.autoFields.classList.add("active");
+    dom.manualFields.classList.remove("active");
+  } else {
+    dom.tabAuto.classList.remove("active");
+    dom.tabManual.classList.add("active");
+    dom.autoFields.classList.remove("active");
+    dom.manualFields.classList.add("active");
+  }
+  render();
+}
+
+dom.tabAuto.addEventListener("click", () => switchTab("auto"));
+dom.tabManual.addEventListener("click", () => switchTab("manual"));
+
 dom.resetButton.addEventListener("click", () => {
   dom.lengthInput.value = "9";
   dom.widthInput.value = "5";
@@ -268,6 +344,16 @@ dom.resetButton.addEventListener("click", () => {
   dom.simulationNameInput.value = "";
   dom.allowStandardInput.checked = true;
   dom.allowLowInput.checked = true;
+  dom.fanCountSelect.value = "4";
+  dom.manualDiameterInput.value = "1.32";
+  dom.manualMountSelect.value = "standard";
+
+  state.mode = "auto";
+  dom.tabAuto.classList.add("active");
+  dom.tabManual.classList.remove("active");
+  dom.autoFields.classList.add("active");
+  dom.manualFields.classList.remove("active");
+
   resetState(state);
   render();
 });
@@ -313,7 +399,16 @@ dom.resultsList.addEventListener("change", (event) => {
   updateExportControls();
 });
 
-[dom.lengthInput, dom.widthInput, dom.heightInput, dom.allowStandardInput, dom.allowLowInput].forEach(
+[
+  dom.lengthInput,
+  dom.widthInput,
+  dom.heightInput,
+  dom.allowStandardInput,
+  dom.allowLowInput,
+  dom.fanCountSelect,
+  dom.manualDiameterInput,
+  dom.manualMountSelect
+].forEach(
   (input) => {
     input.addEventListener("change", () => {
       render();

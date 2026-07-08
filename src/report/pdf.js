@@ -160,7 +160,7 @@ function renderSelectedOptionsOverview(state, selectedOptions) {
 
   if (state.kind === "uniformity-ok") {
     const rows = selectedOptions.map((option) => [
-      `Option ${getReportOptionNumber(state, option)}`,
+      option.isCustom ? "Configuration personnalisee" : `Option ${getReportOptionNumber(state, option)}`,
       `${option.nx} × ${option.ny}`,
       formatMeters(option.diameter),
       option.mountMode.label,
@@ -182,17 +182,43 @@ function renderSelectedOptionsOverview(state, selectedOptions) {
 
 function renderUniformityOptionPage(state, option) {
   const optionNumber = getReportOptionNumber(state, option);
+  const kicker = option.isCustom ? "Configuration personnalisee" : `Option ${optionNumber}`;
+  const sub = option.isCustom
+    ? `${option.fanCount} brasseur${option.fanCount > 1 ? "s" : ""} • ${option.mountMode.label} • ${option.conformity.conforming ? "CONFORME" : "NON CONFORME"}`
+    : `${option.fanCount} brasseur${option.fanCount > 1 ? "s" : ""} • ${option.mountMode.label}`;
+
+  const customAlerts = [];
+  if (option.isCustom) {
+    const c = option.conformity;
+    if (!c.wallClearanceOk) {
+      customAlerts.push(`Distance aux murs insuffisante (diametre ${formatMeters(option.diameter)} > mur ${formatMeters(option.wallClearance)})`);
+    }
+    if (!c.spacingOk) {
+      customAlerts.push(`Entraxe insuffisant (${formatMeters(option.interFanSpacing)} < 2.5 D)`);
+    }
+    if (!c.coverageOk) {
+      customAlerts.push(`FCC hors limites [0.2 - 0.4] (${formatFactor(option.coverageFactor)})`);
+    }
+    if (!c.safetyHeightOk) {
+      customAlerts.push(`Hauteur sous pales hors limites de securite (${formatMeters(option.bladeHeight)} < ${option.diameter < 2.13 ? "2.13m" : "3.05m"})`);
+    }
+    if (!c.heightRangeOk) {
+      customAlerts.push(`Hauteur de fonctionnement non optimale (${formatMeters(option.bladeHeight)})`);
+    }
+  }
+
+  const allWarnings = [...customAlerts, ...getCandidateWarnings(option)];
 
   return `
     <section class="report-page report-option-page">
       <div class="report-section-head">
-        <p class="report-section-kicker">Option ${optionNumber}</p>
+        <p class="report-section-kicker">${kicker}</p>
         <h2>${escapeHtml(`${option.nx} × ${option.ny} cellules`)}</h2>
-        <p>${escapeHtml(`${option.fanCount} brasseur${option.fanCount > 1 ? "s" : ""} • ${option.mountMode.label}`)}</p>
+        <p>${escapeHtml(sub)}</p>
       </div>
 
       ${renderReportMetricGrid([
-        ["Diametre theorique recommande", formatMeters(option.diameter)],
+        ["Diametre du brasseur", formatMeters(option.diameter)],
         ["Facteur de forme", formatFactor(option.formFactor)],
         ["FCC calc.", formatFactor(option.coverageFactor)],
         ["Hauteur sous pales", formatMeters(option.bladeHeight)],
@@ -217,7 +243,7 @@ function renderUniformityOptionPage(state, option) {
             ],
             true
           )}
-          ${renderReportWarningList(getCandidateWarnings(option))}
+          ${renderReportWarningList(allWarnings)}
         </div>
       </div>
     </section>

@@ -253,3 +253,132 @@ export function getFallbackFlushCandidate(room, maxFans, realDiameters) {
 
   return candidates.sort(compareCandidates)[0] || null;
 }
+
+export function findBestGridForFanCount(room, fanCount) {
+  let bestNx = 1;
+  let bestNy = fanCount;
+  let minFormFactor = Number.POSITIVE_INFINITY;
+
+  for (let nx = 1; nx <= fanCount; nx += 1) {
+    if (fanCount % nx !== 0) {
+      continue;
+    }
+    const ny = fanCount / nx;
+    const cellLength = room.length / nx;
+    const cellWidth = room.width / ny;
+    const formFactor = Math.max(cellLength, cellWidth) / Math.min(cellLength, cellWidth);
+
+    if (formFactor < minFormFactor) {
+      minFormFactor = formFactor;
+      bestNx = nx;
+      bestNy = ny;
+    }
+  }
+
+  return { nx: bestNx, ny: bestNy };
+}
+
+export function evaluateCustomCandidate(room, fanCount, diameter, mountMode, realDiameters) {
+  const { nx, ny } = findBestGridForFanCount(room, fanCount);
+
+  const cellLength = room.length / nx;
+  const cellWidth = room.width / ny;
+  const cellArea = cellLength * cellWidth;
+  const cellShort = Math.min(cellLength, cellWidth);
+  const cellLong = Math.max(cellLength, cellWidth);
+  const formFactor = cellLong / cellShort;
+
+  const coverageMinDiameter = 0.2 * Math.sqrt(cellArea);
+  const coverageMaxDiameter = 0.4 * Math.sqrt(cellArea);
+
+  const spacings = [];
+  if (nx > 1) {
+    spacings.push(cellLength);
+  }
+  if (ny > 1) {
+    spacings.push(cellWidth);
+  }
+  const interFanSpacing = spacings.length > 0 ? Math.min(...spacings) : null;
+
+  // Calculs hauteurs
+  const mountDistance = mountMode.factor * diameter;
+  const bladeHeight = room.height - mountDistance;
+  const recommendedSmallHeight = 1.4 * diameter;
+
+  // Validations individuelles des règles de conformité BRASSE
+  const wallClearanceOk = cellShort / 2 >= diameter - EPS;
+  const spacingOk = interFanSpacing === null || interFanSpacing >= 2.5 * diameter - EPS;
+  const coverageFactor = diameter / Math.sqrt(cellArea);
+  const coverageOk = coverageFactor >= 0.2 - EPS && coverageFactor <= 0.4 + EPS;
+
+  const isSmall = diameter < 2.13;
+  const safetyHeightLimit = isSmall ? 2.13 : 3.05;
+  const safetyHeightOk = bladeHeight >= safetyHeightLimit - EPS;
+
+  let heightRangeOk = false;
+  if (isSmall) {
+    heightRangeOk = bladeHeight <= 2 * diameter + EPS;
+  } else {
+    heightRangeOk = bladeHeight >= 0.8 * diameter - EPS && bladeHeight <= 2 * diameter + EPS;
+  }
+
+  const recommendedSmallHeightMet = isSmall ? bladeHeight >= recommendedSmallHeight - EPS : true;
+  const conforming = wallClearanceOk && spacingOk && coverageOk && safetyHeightOk && heightRangeOk;
+
+  // Calcul des diamètres réels compatibles pour information complémentaire
+  const intervals = buildHeightFeasibility(room.height, mountMode.factor, coverageMinDiameter, Math.min(coverageMaxDiameter, cellShort / 2, spacings.length > 0 ? interFanSpacing / 2.5 : Number.POSITIVE_INFINITY));
+  const compatibleRealDiameters = getCompatibleRealDiameters(realDiameters, intervals, cellArea);
+
+  const coordinates = [];
+  for (let ix = 0; ix < nx; ix += 1) {
+    for (let iy = 0; iy < ny; iy += 1) {
+      coordinates.push({
+        x: (ix + 0.5) * cellLength,
+        y: (iy + 0.5) * cellWidth
+      });
+    }
+  }
+
+  return {
+    key: `custom-${nx}x${ny}-${mountMode.id}`,
+    nx,
+    ny,
+    fanCount,
+    room,
+    mountMode,
+    cellLength,
+    cellWidth,
+    cellArea,
+    cellShort,
+    cellLong,
+    formFactor,
+    diameter,
+    theoreticalMaxDiameter: diameter,
+    coverageFactor,
+    mountDistance,
+    bladeHeight,
+    recommendedSmallHeightMet,
+    recommendedSmallHeight,
+    wallClearance: cellShort / 2,
+    interFanSpacing,
+    geometryCaps: {
+      coverageMinDiameter,
+      coverageMaxDiameter,
+      wallMaxDiameter: cellShort / 2,
+      interFanMaxDiameter: spacings.length > 0 ? interFanSpacing / 2.5 : Number.POSITIVE_INFINITY
+    },
+    compatibleRealDiameters,
+    coordinates,
+    fanClass: isSmall ? "small" : "large",
+    isCustom: true,
+    conformity: {
+      conforming,
+      wallClearanceOk,
+      spacingOk,
+      coverageOk,
+      safetyHeightOk,
+      heightRangeOk
+    },
+    strictAdvice: "Veuillez vérifier la conformité physique avec le fabricant de l'appareil choisi."
+  };
+}

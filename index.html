@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="./styles/layout.css">
   <link rel="stylesheet" href="./styles/components.css">
   <link rel="stylesheet" href="./styles/catalog.css">
+  <link rel="stylesheet" href="./styles/tabs.css">
 </head>
 <body>
   <div class="page">
@@ -103,7 +104,10 @@
     <div class="layout">
       <aside class="panel">
         <div class="panel-body">
-          <h2 class="section-title">Données du local</h2>
+          <div class="tabs-header">
+            <button type="button" class="tab-btn active" id="tab-auto">Dimensionnement auto</button>
+            <button type="button" class="tab-btn" id="tab-manual">Tester un cas réel</button>
+          </div>
 
           <form id="calculator-form">
             <div class="field">
@@ -127,17 +131,50 @@
               <input id="height" name="height" type="number" min="0.1" step="0.01" value="2.5">
             </div>
 
-            <div class="stack">
-              <span class="hint">Montages étudiés</span>
-              <div class="check-list">
-                <label class="check">
-                  <input id="allow-standard" type="checkbox" checked>
-                  <span>Standard (distance plafond-pales superieure a <code>0,35 D</code>).</span>
-                </label>
-                <label class="check">
-                  <input id="allow-low" type="checkbox" checked>
-                  <span>Low-profile (jusqu'à <code>0,25 D</code>, avec baisse d'environ 15 % de la vitesse d'air).</span>
-                </label>
+            <div id="auto-fields" class="tab-content active">
+              <div class="stack">
+                <span class="hint">Montages étudiés</span>
+                <div class="check-list">
+                  <label class="check">
+                    <input id="allow-standard" type="checkbox" checked>
+                    <span>Standard (distance plafond-pales superieure a <code>0,35 D</code>).</span>
+                  </label>
+                  <label class="check">
+                    <input id="allow-low" type="checkbox" checked>
+                    <span>Low-profile (jusqu'à <code>0,25 D</code>, avec baisse d'environ 15 % de la vitesse d'air).</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div id="manual-fields" class="tab-content">
+              <div class="field">
+                <label for="fan-count">Nombre de brasseurs</label>
+                <select id="fan-count" name="fanCount">
+                  <option value="1">1</option>
+                  <option value="2">2</option>
+                  <option value="4" selected>4</option>
+                  <option value="6">6</option>
+                  <option value="8">8</option>
+                  <option value="9">9</option>
+                  <option value="12">12</option>
+                  <option value="16">16</option>
+                </select>
+              </div>
+
+              <div class="field-grid">
+                <div class="field">
+                  <label for="manual-diameter">Diamètre (m)</label>
+                  <input id="manual-diameter" name="manualDiameter" type="number" min="0.1" max="10" step="0.01" value="1.32">
+                </div>
+                <div class="field">
+                  <label for="manual-mount">Montage</label>
+                  <select id="manual-mount" name="manualMount">
+                    <option value="standard" selected>Standard (≥0,35D)</option>
+                    <option value="low-profile">Low-profile (0,25D)</option>
+                    <option value="flush">Flush (0,15D)</option>
+                  </select>
+                </div>
               </div>
             </div>
 

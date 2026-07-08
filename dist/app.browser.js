@@ -1234,6 +1234,13 @@ function getDomRefs() {
     heightInput: document.getElementById("height"),
     allowStandardInput: document.getElementById("allow-standard"),
     allowLowInput: document.getElementById("allow-low"),
+    tabAuto: document.getElementById("tab-auto"),
+    tabManual: document.getElementById("tab-manual"),
+    autoFields: document.getElementById("auto-fields"),
+    manualFields: document.getElementById("manual-fields"),
+    fanCountSelect: document.getElementById("fan-count"),
+    manualDiameterInput: document.getElementById("manual-diameter"),
+    manualMountSelect: document.getElementById("manual-mount"),
     resetButton: document.getElementById("reset-button"),
     emptyState: document.getElementById("empty-state"),
     resultsContent: document.getElementById("results-content"),
@@ -1262,6 +1269,7 @@ function getDomRefs() {
 // src/app/state.js
 function createAppState() {
   return {
+    mode: "auto",
     latestReportState: null
   };
 }
@@ -1329,6 +1337,7 @@ function toggleLatestReportOptionSelection(state, optionKey, selected) {
 }
 
 function resetState(state) {
+  state.mode = "auto";
   state.latestReportState = null;
 }
 
@@ -1814,6 +1823,135 @@ function getFallbackFlushCandidate(room, maxFans, realDiameters) {
   }
 
   return candidates.sort(compareCandidates)[0] || null;
+}
+
+function findBestGridForFanCount(room, fanCount) {
+  let bestNx = 1;
+  let bestNy = fanCount;
+  let minFormFactor = Number.POSITIVE_INFINITY;
+
+  for (let nx = 1; nx <= fanCount; nx += 1) {
+    if (fanCount % nx !== 0) {
+      continue;
+    }
+    const ny = fanCount / nx;
+    const cellLength = room.length / nx;
+    const cellWidth = room.width / ny;
+    const formFactor = Math.max(cellLength, cellWidth) / Math.min(cellLength, cellWidth);
+
+    if (formFactor < minFormFactor) {
+      minFormFactor = formFactor;
+      bestNx = nx;
+      bestNy = ny;
+    }
+  }
+
+  return { nx: bestNx, ny: bestNy };
+}
+
+function evaluateCustomCandidate(room, fanCount, diameter, mountMode, realDiameters) {
+  const { nx, ny } = findBestGridForFanCount(room, fanCount);
+
+  const cellLength = room.length / nx;
+  const cellWidth = room.width / ny;
+  const cellArea = cellLength * cellWidth;
+  const cellShort = Math.min(cellLength, cellWidth);
+  const cellLong = Math.max(cellLength, cellWidth);
+  const formFactor = cellLong / cellShort;
+
+  const coverageMinDiameter = 0.2 * Math.sqrt(cellArea);
+  const coverageMaxDiameter = 0.4 * Math.sqrt(cellArea);
+
+  const spacings = [];
+  if (nx > 1) {
+    spacings.push(cellLength);
+  }
+  if (ny > 1) {
+    spacings.push(cellWidth);
+  }
+  const interFanSpacing = spacings.length > 0 ? Math.min(...spacings) : null;
+
+  // Calculs hauteurs
+  const mountDistance = mountMode.factor * diameter;
+  const bladeHeight = room.height - mountDistance;
+  const recommendedSmallHeight = 1.4 * diameter;
+
+  // Validations individuelles des règles de conformité BRASSE
+  const wallClearanceOk = cellShort / 2 >= diameter - EPS;
+  const spacingOk = interFanSpacing === null || interFanSpacing >= 2.5 * diameter - EPS;
+  const coverageFactor = diameter / Math.sqrt(cellArea);
+  const coverageOk = coverageFactor >= 0.2 - EPS && coverageFactor <= 0.4 + EPS;
+
+  const isSmall = diameter < 2.13;
+  const safetyHeightLimit = isSmall ? 2.13 : 3.05;
+  const safetyHeightOk = bladeHeight >= safetyHeightLimit - EPS;
+
+  let heightRangeOk = false;
+  if (isSmall) {
+    heightRangeOk = bladeHeight <= 2 * diameter + EPS;
+  } else {
+    heightRangeOk = bladeHeight >= 0.8 * diameter - EPS && bladeHeight <= 2 * diameter + EPS;
+  }
+
+  const recommendedSmallHeightMet = isSmall ? bladeHeight >= recommendedSmallHeight - EPS : true;
+  const conforming = wallClearanceOk && spacingOk && coverageOk && safetyHeightOk && heightRangeOk;
+
+  // Calcul des diamètres réels compatibles pour information complémentaire
+  const intervals = buildHeightFeasibility(room.height, mountMode.factor, coverageMinDiameter, Math.min(coverageMaxDiameter, cellShort / 2, spacings.length > 0 ? interFanSpacing / 2.5 : Number.POSITIVE_INFINITY));
+  const compatibleRealDiameters = getCompatibleRealDiameters(realDiameters, intervals, cellArea);
+
+  const coordinates = [];
+  for (let ix = 0; ix < nx; ix += 1) {
+    for (let iy = 0; iy < ny; iy += 1) {
+      coordinates.push({
+        x: (ix + 0.5) * cellLength,
+        y: (iy + 0.5) * cellWidth
+      });
+    }
+  }
+
+  return {
+    key: `custom-${nx}x${ny}-${mountMode.id}`,
+    nx,
+    ny,
+    fanCount,
+    room,
+    mountMode,
+    cellLength,
+    cellWidth,
+    cellArea,
+    cellShort,
+    cellLong,
+    formFactor,
+    diameter,
+    theoreticalMaxDiameter: diameter,
+    coverageFactor,
+    mountDistance,
+    bladeHeight,
+    recommendedSmallHeightMet,
+    recommendedSmallHeight,
+    wallClearance: cellShort / 2,
+    interFanSpacing,
+    geometryCaps: {
+      coverageMinDiameter,
+      coverageMaxDiameter,
+      wallMaxDiameter: cellShort / 2,
+      interFanMaxDiameter: spacings.length > 0 ? interFanSpacing / 2.5 : Number.POSITIVE_INFINITY
+    },
+    compatibleRealDiameters,
+    coordinates,
+    fanClass: isSmall ? "small" : "large",
+    isCustom: true,
+    conformity: {
+      conforming,
+      wallClearanceOk,
+      spacingOk,
+      coverageOk,
+      safetyHeightOk,
+      heightRangeOk
+    },
+    strictAdvice: "Veuillez vérifier la conformité physique avec le fabricant de l'appareil choisi."
+  };
 }
 
 // src/ui/catalog.js
@@ -2558,19 +2696,66 @@ function candidateCard(candidate, rank, brasse2Models, realDiameters, selectedOp
   const warnings = getCandidateWarnings(candidate);
   const isSelectedForExport = selectedOptionKeys.has(candidate.key);
 
+  const title = candidate.isCustom ? "Configuration personnalisée" : `Option ${rank}`;
+  let badge = "";
+  let customAlertsHtml = "";
+
+  if (candidate.isCustom) {
+    const c = candidate.conformity;
+    if (c.conforming) {
+      badge = `<span class="badge success">Conforme</span>`;
+      customAlertsHtml = `
+        <div class="notice success" style="margin-bottom: 12px;">
+          <strong>Calepinage conforme</strong>
+          Cette configuration respecte toutes les règles de hauteur, de distances et de couverture recommandées par le guide BRASSE.
+        </div>
+      `;
+    } else {
+      badge = `<span class="badge danger">Non conforme</span>`;
+      const alerts = [];
+      if (!c.wallClearanceOk) {
+        alerts.push(`<strong>Distance aux murs insuffisante</strong> : le diamètre (${formatMeters(candidate.diameter)}) dépasse la distance entre le centre et le mur le plus proche (${formatMeters(candidate.wallClearance)}).`);
+      }
+      if (!c.spacingOk) {
+        alerts.push(`<strong>Entraxe insuffisant</strong> : l'entraxe entre ventilateurs (${formatMeters(candidate.interFanSpacing)}) est inférieur à la limite réglementaire de 2.5 D (${formatMeters(2.5 * candidate.diameter)}).`);
+      }
+      if (!c.coverageOk) {
+        alerts.push(`<strong>Facteur de couverture (FCC) non optimal</strong> : le FCC calculé (${formatFactor(candidate.coverageFactor)}) est en dehors de la plage réglementaire de [0,20 - 0,40].`);
+      }
+      if (!c.safetyHeightOk) {
+        const limit = candidate.diameter < 2.13 ? "2,13 m" : "3,05 m";
+        alerts.push(`<strong>Hauteur de sécurité insuffisante</strong> : la hauteur sous pales (${formatMeters(candidate.bladeHeight)}) est inférieure au seuil de sécurité obligatoire pour cette classe d'appareil (${limit}).`);
+      }
+      if (!c.heightRangeOk) {
+        const range = candidate.diameter < 2.13 ? "inférieure à 2 D" : "comprise entre 0,8 D et 2 D";
+        alerts.push(`<strong>Hauteur de fonctionnement non optimale</strong> : la hauteur sous pales (${formatMeters(candidate.bladeHeight)}) doit être ${range} pour assurer un bon confort.`);
+      }
+      customAlertsHtml = `
+        <div class="notice danger" style="margin-bottom: 12px;">
+          <strong>Détail des non-conformités :</strong>
+          <ul style="margin: 8px 0 0; padding-left: 18px;">
+            ${alerts.map((a) => `<li style="margin-bottom: 4px;">${a}</li>`).join("")}
+          </ul>
+        </div>
+      `;
+    }
+  }
+
   return `
     <article class="result-card">
       <div class="result-head">
         <div>
-          <h3 class="result-title">Option ${rank}</h3>
+          <h3 class="result-title">${title}${badge}</h3>
           <p class="result-subtitle">
             ${candidate.fanCount} brasseur${candidate.fanCount > 1 ? "s" : ""} centre${candidate.fanCount > 1 ? "s" : ""}
             dans des cellules de ${formatMeters(candidate.cellLength)} × ${formatMeters(candidate.cellWidth)},
-            avec un diametre theorique recommande de ${formatMeters(candidate.diameter)}.
+            avec un diamètre de ${formatMeters(candidate.diameter)}.
           </p>
         </div>
         ${renderExportOptionToggle(candidate.key, isSelectedForExport)}
       </div>
+
+      ${customAlertsHtml}
 
       <div class="result-grid">
         <div class="plan-wrap" style="${planWrapStyle(candidate)}">${svgForCandidate(candidate)}</div>
@@ -2884,7 +3069,7 @@ function renderSelectedOptionsOverview(state, selectedOptions) {
 
   if (state.kind === "uniformity-ok") {
     const rows = selectedOptions.map((option) => [
-      `Option ${getReportOptionNumber(state, option)}`,
+      option.isCustom ? "Configuration personnalisee" : `Option ${getReportOptionNumber(state, option)}`,
       `${option.nx} × ${option.ny}`,
       formatMeters(option.diameter),
       option.mountMode.label,
@@ -2906,17 +3091,43 @@ function renderSelectedOptionsOverview(state, selectedOptions) {
 
 function renderUniformityOptionPage(state, option) {
   const optionNumber = getReportOptionNumber(state, option);
+  const kicker = option.isCustom ? "Configuration personnalisee" : `Option ${optionNumber}`;
+  const sub = option.isCustom
+    ? `${option.fanCount} brasseur${option.fanCount > 1 ? "s" : ""} • ${option.mountMode.label} • ${option.conformity.conforming ? "CONFORME" : "NON CONFORME"}`
+    : `${option.fanCount} brasseur${option.fanCount > 1 ? "s" : ""} • ${option.mountMode.label}`;
+
+  const customAlerts = [];
+  if (option.isCustom) {
+    const c = option.conformity;
+    if (!c.wallClearanceOk) {
+      customAlerts.push(`Distance aux murs insuffisante (diametre ${formatMeters(option.diameter)} > mur ${formatMeters(option.wallClearance)})`);
+    }
+    if (!c.spacingOk) {
+      customAlerts.push(`Entraxe insuffisant (${formatMeters(option.interFanSpacing)} < 2.5 D)`);
+    }
+    if (!c.coverageOk) {
+      customAlerts.push(`FCC hors limites [0.2 - 0.4] (${formatFactor(option.coverageFactor)})`);
+    }
+    if (!c.safetyHeightOk) {
+      customAlerts.push(`Hauteur sous pales hors limites de securite (${formatMeters(option.bladeHeight)} < ${option.diameter < 2.13 ? "2.13m" : "3.05m"})`);
+    }
+    if (!c.heightRangeOk) {
+      customAlerts.push(`Hauteur de fonctionnement non optimale (${formatMeters(option.bladeHeight)})`);
+    }
+  }
+
+  const allWarnings = [...customAlerts, ...getCandidateWarnings(option)];
 
   return `
     <section class="report-page report-option-page">
       <div class="report-section-head">
-        <p class="report-section-kicker">Option ${optionNumber}</p>
+        <p class="report-section-kicker">${kicker}</p>
         <h2>${escapeHtml(`${option.nx} × ${option.ny} cellules`)}</h2>
-        <p>${escapeHtml(`${option.fanCount} brasseur${option.fanCount > 1 ? "s" : ""} • ${option.mountMode.label}`)}</p>
+        <p>${escapeHtml(sub)}</p>
       </div>
 
       ${renderReportMetricGrid([
-        ["Diametre theorique recommande", formatMeters(option.diameter)],
+        ["Diametre du brasseur", formatMeters(option.diameter)],
         ["Facteur de forme", formatFactor(option.formFactor)],
         ["FCC calc.", formatFactor(option.coverageFactor)],
         ["Hauteur sous pales", formatMeters(option.bladeHeight)],
@@ -2941,7 +3152,7 @@ function renderUniformityOptionPage(state, option) {
             ],
             true
           )}
-          ${renderReportWarningList(getCandidateWarnings(option))}
+          ${renderReportWarningList(allWarnings)}
         </div>
       </div>
     </section>
@@ -3373,8 +3584,16 @@ function validateInputs(values) {
   if (!(values.height > 0)) {
     issues.push("La hauteur sous plafond doit etre strictement positive.");
   }
-  if (!dom.allowStandardInput.checked && !dom.allowLowInput.checked) {
-    issues.push("Selectionnez au moins un type de montage.");
+
+  if (state.mode === "auto") {
+    if (!dom.allowStandardInput.checked && !dom.allowLowInput.checked) {
+      issues.push("Selectionnez au moins un type de montage.");
+    }
+  } else {
+    const diameter = parseNumber(dom.manualDiameterInput);
+    if (!(diameter > 0)) {
+      issues.push("Le diametre du brasseur doit etre strictement positif.");
+    }
   }
   return issues;
 }
@@ -3495,6 +3714,50 @@ function render() {
     width: rawValues.width,
     height: rawValues.height
   };
+
+  if (state.mode === "manual") {
+    const diameter = parseNumber(dom.manualDiameterInput);
+    const fanCount = Number(dom.fanCountSelect.value);
+    const mountModeId = dom.manualMountSelect.value;
+    let mountMode = MOUNT_MODES.find((m) => m.id === mountModeId);
+    if (!mountMode && mountModeId === "flush") {
+      mountMode = FLUSH_MODE;
+    }
+
+    const candidate = evaluateCustomCandidate(room, fanCount, diameter, mountMode, realDiameters);
+    const recommendation = `Configuration personnalisee : ${candidate.nx} × ${candidate.ny} - ${candidate.fanCount} brasseur${candidate.fanCount > 1 ? "s" : ""} (${candidate.conformity.conforming ? "conforme" : "non conforme"})`;
+
+    updateHeader({
+      room,
+      recommendation,
+      generatedAt
+    });
+
+    setLatestReportState(state, {
+      kind: "uniformity-ok",
+      simulationName: getSimulationName(),
+      room,
+      candidates: [candidate],
+      selectedOptionKeys: createSelectedReportOptionKeys([candidate]),
+      modesLabel: candidate.mountMode.label,
+      generatedAt,
+      context: `Configuration personnalisee • trame : ${candidate.nx} × ${candidate.ny}`
+    });
+
+    renderSummary(dom, room, [candidate], brasse2Models);
+    dom.statusNote.innerHTML = "";
+    renderResults(
+      dom,
+      [candidate],
+      brasse2Models,
+      realDiameters,
+      state.latestReportState?.selectedOptionKeys || []
+    );
+    updateExportControls();
+    dom.resultsContent.classList.remove("hidden");
+    return;
+  }
+
   const modes = getSelectedModes();
   const candidates = enumerateCandidates(room, MAX_GRID_FANS, modes, realDiameters);
   const fallbackFlush =
@@ -3538,6 +3801,29 @@ dom.form.addEventListener("submit", (event) => {
   render();
 });
 
+function switchTab(mode) {
+  if (state.mode === mode) {
+    return;
+  }
+  state.mode = mode;
+
+  if (mode === "auto") {
+    dom.tabAuto.classList.add("active");
+    dom.tabManual.classList.remove("active");
+    dom.autoFields.classList.add("active");
+    dom.manualFields.classList.remove("active");
+  } else {
+    dom.tabAuto.classList.remove("active");
+    dom.tabManual.classList.add("active");
+    dom.autoFields.classList.remove("active");
+    dom.manualFields.classList.add("active");
+  }
+  render();
+}
+
+dom.tabAuto.addEventListener("click", () => switchTab("auto"));
+dom.tabManual.addEventListener("click", () => switchTab("manual"));
+
 dom.resetButton.addEventListener("click", () => {
   dom.lengthInput.value = "9";
   dom.widthInput.value = "5";
@@ -3545,6 +3831,16 @@ dom.resetButton.addEventListener("click", () => {
   dom.simulationNameInput.value = "";
   dom.allowStandardInput.checked = true;
   dom.allowLowInput.checked = true;
+  dom.fanCountSelect.value = "4";
+  dom.manualDiameterInput.value = "1.32";
+  dom.manualMountSelect.value = "standard";
+
+  state.mode = "auto";
+  dom.tabAuto.classList.add("active");
+  dom.tabManual.classList.remove("active");
+  dom.autoFields.classList.add("active");
+  dom.manualFields.classList.remove("active");
+
   resetState(state);
   render();
 });
@@ -3590,7 +3886,16 @@ dom.resultsList.addEventListener("change", (event) => {
   updateExportControls();
 });
 
-[dom.lengthInput, dom.widthInput, dom.heightInput, dom.allowStandardInput, dom.allowLowInput].forEach(
+[
+  dom.lengthInput,
+  dom.widthInput,
+  dom.heightInput,
+  dom.allowStandardInput,
+  dom.allowLowInput,
+  dom.fanCountSelect,
+  dom.manualDiameterInput,
+  dom.manualMountSelect
+].forEach(
   (input) => {
     input.addEventListener("change", () => {
       render();

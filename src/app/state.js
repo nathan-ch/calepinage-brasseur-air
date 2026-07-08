@@ -1,5 +1,6 @@
 export function createAppState() {
   return {
+    mode: "auto",
     latestReportState: null
   };
 }
@@ -67,5 +68,6 @@ export function toggleLatestReportOptionSelection(state, optionKey, selected) {
 }
 
 export function resetState(state) {
+  state.mode = "auto";
   state.latestReportState = null;
 }

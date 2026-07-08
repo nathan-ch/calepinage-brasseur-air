@@ -347,19 +347,66 @@ function candidateCard(candidate, rank, brasse2Models, realDiameters, selectedOp
   const warnings = getCandidateWarnings(candidate);
   const isSelectedForExport = selectedOptionKeys.has(candidate.key);
 
+  const title = candidate.isCustom ? "Configuration personnalisée" : `Option ${rank}`;
+  let badge = "";
+  let customAlertsHtml = "";
+
+  if (candidate.isCustom) {
+    const c = candidate.conformity;
+    if (c.conforming) {
+      badge = `<span class="badge success">Conforme</span>`;
+      customAlertsHtml = `
+        <div class="notice success" style="margin-bottom: 12px;">
+          <strong>Calepinage conforme</strong>
+          Cette configuration respecte toutes les règles de hauteur, de distances et de couverture recommandées par le guide BRASSE.
+        </div>
+      `;
+    } else {
+      badge = `<span class="badge danger">Non conforme</span>`;
+      const alerts = [];
+      if (!c.wallClearanceOk) {
+        alerts.push(`<strong>Distance aux murs insuffisante</strong> : le diamètre (${formatMeters(candidate.diameter)}) dépasse la distance entre le centre et le mur le plus proche (${formatMeters(candidate.wallClearance)}).`);
+      }
+      if (!c.spacingOk) {
+        alerts.push(`<strong>Entraxe insuffisant</strong> : l'entraxe entre ventilateurs (${formatMeters(candidate.interFanSpacing)}) est inférieur à la limite réglementaire de 2.5 D (${formatMeters(2.5 * candidate.diameter)}).`);
+      }
+      if (!c.coverageOk) {
+        alerts.push(`<strong>Facteur de couverture (FCC) non optimal</strong> : le FCC calculé (${formatFactor(candidate.coverageFactor)}) est en dehors de la plage réglementaire de [0,20 - 0,40].`);
+      }
+      if (!c.safetyHeightOk) {
+        const limit = candidate.diameter < 2.13 ? "2,13 m" : "3,05 m";
+        alerts.push(`<strong>Hauteur de sécurité insuffisante</strong> : la hauteur sous pales (${formatMeters(candidate.bladeHeight)}) est inférieure au seuil de sécurité obligatoire pour cette classe d'appareil (${limit}).`);
+      }
+      if (!c.heightRangeOk) {
+        const range = candidate.diameter < 2.13 ? "inférieure à 2 D" : "comprise entre 0,8 D et 2 D";
+        alerts.push(`<strong>Hauteur de fonctionnement non optimale</strong> : la hauteur sous pales (${formatMeters(candidate.bladeHeight)}) doit être ${range} pour assurer un bon confort.`);
+      }
+      customAlertsHtml = `
+        <div class="notice danger" style="margin-bottom: 12px;">
+          <strong>Détail des non-conformités :</strong>
+          <ul style="margin: 8px 0 0; padding-left: 18px;">
+            ${alerts.map((a) => `<li style="margin-bottom: 4px;">${a}</li>`).join("")}
+          </ul>
+        </div>
+      `;
+    }
+  }
+
   return `
     <article class="result-card">
       <div class="result-head">
         <div>
-          <h3 class="result-title">Option ${rank}</h3>
+          <h3 class="result-title">${title}${badge}</h3>
           <p class="result-subtitle">
             ${candidate.fanCount} brasseur${candidate.fanCount > 1 ? "s" : ""} centre${candidate.fanCount > 1 ? "s" : ""}
             dans des cellules de ${formatMeters(candidate.cellLength)} × ${formatMeters(candidate.cellWidth)},
-            avec un diametre theorique recommande de ${formatMeters(candidate.diameter)}.
+            avec un diamètre de ${formatMeters(candidate.diameter)}.
           </p>
         </div>
         ${renderExportOptionToggle(candidate.key, isSelectedForExport)}
       </div>
+
+      ${customAlertsHtml}
 
       <div class="result-grid">
         <div class="plan-wrap" style="${planWrapStyle(candidate)}">${svgForCandidate(candidate)}</div>

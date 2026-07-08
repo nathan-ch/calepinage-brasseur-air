@@ -129,19 +129,19 @@ export function evaluateCandidate(room, nx, ny, mountMode, realDiameters) {
     null
   );
   const theoreticalMaxDiameter = bestInterval.upper;
-  const compatibleRealDiameters = getCompatibleRealDiameters(realDiameters, intervals, cellArea);
-  if (compatibleRealDiameters.length === 0) {
-    return null;
-  }
+  const compatibleRealDiameters = Array.isArray(realDiameters)
+    ? getCompatibleRealDiameters(realDiameters, intervals, cellArea)
+    : [];
 
-  const selectedRealDiameter = compatibleRealDiameters[compatibleRealDiameters.length - 1];
-  const diameter = selectedRealDiameter.diameter;
+  // Le dimensionnement retourne un diamètre théorique recommandé indépendant d'une liste de modèles.
+  // La sélection d'un modèle réel (et donc d'un diamètre nominal) est laissée à l'utilisateur.
+  const diameter = theoreticalMaxDiameter;
   const mountDistance = mountMode.factor * diameter;
   const bladeHeight = room.height - mountDistance;
-  const coverageFactor = selectedRealDiameter.coverageFactor;
+  const coverageFactor = getCoverageFactorForDiameter(cellArea, diameter);
   const recommendedSmallHeight = 1.4 * diameter;
   const recommendedSmallHeightMet =
-    selectedRealDiameter.fanClass === "small"
+    bestInterval.fanClass === "small"
       ? bladeHeight >= recommendedSmallHeight - EPS
       : true;
 
@@ -185,7 +185,7 @@ export function evaluateCandidate(room, nx, ny, mountMode, realDiameters) {
     },
     compatibleRealDiameters,
     coordinates,
-    fanClass: selectedRealDiameter.fanClass,
+    fanClass: bestInterval.fanClass,
     strictAdvice:
       "Verifier la fiche du modele retenu si son diametre nominal est proche d'une limite geometrique ou d'une limite de hauteur du guide."
   };

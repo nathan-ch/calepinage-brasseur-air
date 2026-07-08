@@ -1,17 +1,11 @@
 import { getSelectedReportOptions } from "../app/state.js";
 import {
-  getBrasse2ModelsForCandidate,
-  getReportModelHighlights
-} from "../core/brasse2.js";
-import {
   getCandidateWarnings
 } from "../core/messages.js";
 import {
   escapeHtml,
   formatDateTime,
   formatDb,
-  formatDiameterCm,
-  formatDiameterCmList,
   formatFactor,
   formatMeters,
   formatNumber,
@@ -37,18 +31,6 @@ function getAllReportOptions(state) {
 function getReportOptionNumber(state, option) {
   const index = getAllReportOptions(state).findIndex((item) => item.key === option.key);
   return index >= 0 ? index + 1 : null;
-}
-
-function getDistinctCompatibleModels(options, brasse2Models) {
-  const modelsById = new Map();
-
-  options.forEach((option) => {
-    getBrasse2ModelsForCandidate(option, brasse2Models).forEach((model) => {
-      modelsById.set(model.id, model);
-    });
-  });
-
-  return [...modelsById.values()];
 }
 
 function getMaxDiameterSummary(options) {
@@ -141,44 +123,8 @@ function renderReportTable(headers, rows, compact = false) {
   `;
 }
 
-function renderModelHighlights(option, brasse2Models) {
-  const highlights = getReportModelHighlights(option, brasse2Models);
-  if (highlights.length === 0) {
-    return `
-      <div class="report-note">
-        <strong>Modeles pre-selectionnes</strong>
-        <p>Aucun modele compatible dans la base BRASSE II embarquee sur les diametres admissibles de cette option.</p>
-      </div>
-    `;
-  }
-
-  const rows = highlights.map((entry) => [
-    entry.title,
-    `${entry.model.brand} ${entry.model.model}`,
-    `${entry.model.diameterCm} cm`,
-    Number.isFinite(entry.model.compatibleOption.coverageFactor)
-      ? formatFactor(entry.model.compatibleOption.coverageFactor)
-      : "—",
-    formatTemp(entry.model.ceDirDeboutMax),
-    `${formatNumber(entry.model.cfeDirDeboutMax, 4)} °C/W`,
-    formatDb(entry.model.lwaMaxDbA)
-  ]);
-
-  return `
-    <section class="report-section">
-      <h3>Modeles pre-selectionnes</h3>
-      ${renderReportTable(
-        ["Lecture", "Marque / modele", "Diam.", "FCC", "CE dir.", "CFE dir.", "LwA"],
-        rows,
-        true
-      )}
-    </section>
-  `;
-}
-
-function renderStudySummarySection(state, selectedOptions, brasse2Models) {
+function renderStudySummarySection(state, selectedOptions) {
   const roomArea = state.room.length * state.room.width;
-  const compatibleModels = getDistinctCompatibleModels(selectedOptions, brasse2Models);
   const maxDiameterSummary = getMaxDiameterSummary(selectedOptions);
   const baseCards = [
     [
@@ -190,11 +136,6 @@ function renderStudySummarySection(state, selectedOptions, brasse2Models) {
       "Diametre max",
       maxDiameterSummary.value,
       maxDiameterSummary.detail
-    ],
-    [
-      "Base BRASSE II",
-      compatibleModels.length > 0 ? `${compatibleModels.length} modeles` : "Aucun modele",
-      "Compatibles avec les options exportees"
     ]
   ];
 
@@ -232,7 +173,7 @@ function renderSelectedOptionsOverview(state, selectedOptions) {
       <section class="report-block">
         <h2>Synthese de ou des option(s) retenue(s) :</h2>
         ${renderReportTable(
-          ["Option", "Trame", "Diametre reel", "Montage", "FCC reel"],
+          ["Option", "Trame", "Diametre theorique", "Montage", "FCC calc."],
           rows,
           true
         )}
@@ -241,7 +182,7 @@ function renderSelectedOptionsOverview(state, selectedOptions) {
   }
 }
 
-function renderUniformityOptionPage(state, option, brasse2Models) {
+function renderUniformityOptionPage(state, option) {
   const optionNumber = getReportOptionNumber(state, option);
 
   return `
@@ -253,10 +194,10 @@ function renderUniformityOptionPage(state, option, brasse2Models) {
       </div>
 
       ${renderReportMetricGrid([
-        ["Diametre reel retenu", formatMeters(option.diameter)],
+        ["Diametre theorique recommande", formatMeters(option.diameter)],
         ["Diametre theorique max", formatMeters(option.theoreticalMaxDiameter)],
         ["Facteur de forme", formatFactor(option.formFactor)],
-        ["FCC reel", formatFactor(option.coverageFactor)],
+        ["FCC calc.", formatFactor(option.coverageFactor)],
         ["Hauteur sous pales", formatMeters(option.bladeHeight)],
         ["Plafond-pales", formatMeters(option.mountDistance)]
       ])}
@@ -275,21 +216,18 @@ function renderUniformityOptionPage(state, option, brasse2Models) {
                 option.interFanSpacing
                   ? `${formatMeters(option.interFanSpacing)} > 2,5 × D`
                   : "Non applicable"
-              ],
-              ["Diametres admissibles", formatDiameterCmList(option.compatibleRealDiameters)]
+              ]
             ],
             true
           )}
           ${renderReportWarningList(getCandidateWarnings(option))}
         </div>
       </div>
-
-      ${renderModelHighlights(option, brasse2Models)}
     </section>
   `;
 }
 
-function renderReportFirstPage(state, selectedOptions, brasse2Models) {
+function renderReportFirstPage(state, selectedOptions) {
   return `
     <section class="report-page report-first-page">
       <header class="report-cover">
@@ -302,7 +240,7 @@ function renderReportFirstPage(state, selectedOptions, brasse2Models) {
         </p>
       </header>
 
-      ${renderStudySummarySection(state, selectedOptions, brasse2Models)}
+      ${renderStudySummarySection(state, selectedOptions)}
       ${renderSelectedOptionsOverview(state, selectedOptions)}
     </section>
   `;
@@ -588,9 +526,9 @@ export function buildPdfReportDocument(state, brasse2Models) {
 
   if (state.kind === "uniformity-ok") {
     bodyContent = `
-      ${renderReportFirstPage(state, selectedOptions, brasse2Models)}
+      ${renderReportFirstPage(state, selectedOptions)}
       ${selectedOptions
-        .map((option) => renderUniformityOptionPage(state, option, brasse2Models))
+        .map((option) => renderUniformityOptionPage(state, option))
         .join("")}
     `;
   } else {

@@ -1,6 +1,5 @@
 import { EPS } from "../core/constants.js";
 import {
-  buildModelPicks,
   compareAcoustics,
   compareComfort,
   compareEfficiency,
@@ -36,11 +35,14 @@ function registerModelSection(models) {
 }
 
 function getDefaultCompatibleModelsComparator(a, b) {
-  if (a.isSelectedDiameter !== b.isSelectedDiameter) {
-    return a.isSelectedDiameter ? -1 : 1;
+  if (Boolean(a.sizing?.sizeFits) !== Boolean(b.sizing?.sizeFits)) {
+    return a.sizing?.sizeFits ? -1 : 1;
   }
-  if (Math.abs(b.compatibleOption.diameter - a.compatibleOption.diameter) > EPS) {
-    return b.compatibleOption.diameter - a.compatibleOption.diameter;
+  if (Boolean(a.sizing?.coverageValid) !== Boolean(b.sizing?.coverageValid)) {
+    return a.sizing?.coverageValid ? -1 : 1;
+  }
+  if (Math.abs((b.sizing?.coverageFactor ?? -Infinity) - (a.sizing?.coverageFactor ?? -Infinity)) > EPS) {
+    return (b.sizing?.coverageFactor ?? -Infinity) - (a.sizing?.coverageFactor ?? -Infinity);
   }
   return compareComfort(a, b);
 }
@@ -131,7 +133,9 @@ function getDistinctCompatibleModels(items, brasse2Models) {
 
   items.forEach((item) => {
     getBrasse2ModelsForCandidate(item, brasse2Models).forEach((model) => {
-      modelsById.set(model.id, model);
+      if (model?.sizing?.sizeFits && model?.sizing?.coverageValid) {
+        modelsById.set(model.id, model);
+      }
     });
   });
 
@@ -158,25 +162,7 @@ function renderExportOptionToggle(optionKey, checked) {
 }
 
 function renderModelCard(title, model) {
-  if (!model) {
-    return "";
-  }
-  const hasCoverageFactor = Number.isFinite(model.compatibleOption.coverageFactor);
-
-  return `
-    <article class="model-card">
-      <strong>${title}</strong>
-      <h4>${model.brand} - ${model.model}</h4>
-      <p>${model.motor} • ${model.fixation} • ${model.diameterCm} cm${model.isSelectedDiameter ? " • diametre retenu" : ""}</p>
-      <div class="model-stats">
-        <span>${hasCoverageFactor ? `FCC reel du calepinage: ${formatFactor(model.compatibleOption.coverageFactor)}` : `Diametre BRASSE II compatible: ${model.diameterCm} cm`}</span>
-        <span>CE direct debout Vmax: ${formatTemp(model.ceDirDeboutMax)}</span>
-        <span>CFE direct debout Vmax: ${formatNumber(model.cfeDirDeboutMax, 4)} °C/W</span>
-        <span>LwA Vmax: ${formatDb(model.lwaMaxDbA)}</span>
-        <span>${modelMountLabel(model)} (${formatNumber(model.ceilingDistanceCm, 1)} cm de base)</span>
-      </div>
-    </article>
-  `;
+  return "";
 }
 
 function renderModelsTable(models) {
@@ -195,7 +181,9 @@ function renderModelsTable(models) {
         <thead>
           <tr>
             <th>Diam.</th>
-            <th>FCC reel</th>
+            <th>FCC calc.</th>
+            <th>OK dim.</th>
+            <th>OK FCC</th>
             <th>Marque</th>
             <th>Modele</th>
             <th>Moteur</th>
@@ -214,7 +202,9 @@ function renderModelsTable(models) {
               (model) => `
                 <tr>
                   <td>${model.diameterCm}</td>
-                  <td>${Number.isFinite(model.compatibleOption.coverageFactor) ? formatFactor(model.compatibleOption.coverageFactor) : "—"}</td>
+                  <td>${Number.isFinite(model.sizing?.coverageFactor) ? formatFactor(model.sizing.coverageFactor) : "—"}</td>
+                  <td>${model.sizing?.sizeFits ? "Oui" : "Non"}</td>
+                  <td>${model.sizing?.coverageValid ? "Oui" : "Non"}</td>
                   <td>${model.brand}</td>
                   <td>${model.model}</td>
                   <td>${model.motor}</td>
@@ -324,45 +314,35 @@ export function resetResultsModelSections() {
 
 function renderBrasse2Section(candidate, brasse2Models, realDiameters) {
   const models = getBrasse2ModelsForCandidate(candidate, brasse2Models);
+  const filteredModels = models.filter((model) => model?.sizing?.sizeFits);
 
-  if (models.length === 0) {
+  if (filteredModels.length === 0) {
     return `
       <section class="models-shell">
         <div>
-          <h4 class="section-title">Modeles pré-sélectionnés</h4>
+          <h4 class="section-title">Catalogue BRASSE II</h4>
           <p class="section-subtitle" style="margin-bottom:0;">
-            Filtrage sur les diametres BRASSE II admissibles pour ce calepinage.
+            Aucun modele du catalogue n'entre dans le diametre theorique recommande pour cette option.
           </p>
-        </div>
-        <div class="notice warning">
-          <strong>Aucun modele BRASSE II compatible.</strong>
-          La base embarquee couvre ici les diametres disponibles dans BRASSE II :
-          <code>${formatDiameterList(realDiameters)}</code>.
         </div>
       </section>
     `;
   }
 
-  const sectionId = registerModelSection(models);
-  const modelPicks = buildModelPicks(models);
+  const sectionId = registerModelSection(filteredModels);
 
   return `
     <section class="models-shell">
       <div>
-        <h4 class="section-title">Modeles pré-sélectionnés</h4>
+        <h4 class="section-title">Choisir un modele (catalogue BRASSE II)</h4>
         <p class="section-subtitle" style="margin-bottom:0;">
-          Filtrage sur tous les diametres admissibles. Les cartes ci-dessous lisent le meilleur FCC du calepinage,
-          puis les indicateurs BRASSE a Vmax : confort direct debout, efficacite directe debout et acoustique.
+          Liste de modeles a comparer. Le dimensionnement ci-dessus est theorique ; choisissez ensuite un modele adapte.
         </p>
       </div>
 
-      <div class="models-grid">
-        ${modelPicks.map((pick) => renderModelCard(pick.title, pick.model)).join("")}
-      </div>
-
       <details class="models-details">
-        <summary>Voir tous les modeles BRASSE II compatibles (${models.length})</summary>
-        ${renderModelsTablePanel(sectionId, models)}
+        <summary>Voir les modeles du catalogue dans le diametre theorique (${filteredModels.length})</summary>
+        ${renderModelsTablePanel(sectionId, filteredModels)}
       </details>
     </section>
   `;
@@ -380,7 +360,7 @@ function candidateCard(candidate, rank, brasse2Models, realDiameters, selectedOp
           <p class="result-subtitle">
             ${candidate.fanCount} brasseur${candidate.fanCount > 1 ? "s" : ""} centre${candidate.fanCount > 1 ? "s" : ""}
             dans des cellules de ${formatMeters(candidate.cellLength)} × ${formatMeters(candidate.cellWidth)},
-            avec un diametre BRASSE II retenu de ${formatMeters(candidate.diameter)}.
+            avec un diametre theorique recommande de ${formatMeters(candidate.diameter)}.
           </p>
         </div>
         ${renderExportOptionToggle(candidate.key, isSelectedForExport)}
@@ -392,7 +372,7 @@ function candidateCard(candidate, rank, brasse2Models, realDiameters, selectedOp
         <div class="stack">
           <div class="metric-grid">
             <div class="metric-card">
-              <strong>Diametre réel retenu</strong>
+              <strong>Diametre theorique recommande</strong>
               <span>${formatMeters(candidate.diameter)}</span>
             </div>
             <div class="metric-card">
@@ -430,8 +410,12 @@ function candidateCard(candidate, rank, brasse2Models, realDiameters, selectedOp
               <span>${candidate.interFanSpacing ? `${formatMeters(candidate.interFanSpacing)} &gt; ${formatNumber(2.5, 1)} × D` : "Non applicable (un seul brasseur)"}</span>
             </div>
             <div class="detail-item detail-item-stack">
-              <strong>Diametres BRASSE II admissibles (FCC &gt;= 0,2)</strong>
-              <span>${candidate.compatibleRealDiameters.map((option) => formatDiameterCm(option.diameter)).join(", ")}</span>
+              <strong>Diametres BRASSE II admissibles (info)</strong>
+              <span>${
+                candidate.compatibleRealDiameters?.length
+                  ? candidate.compatibleRealDiameters.map((option) => formatDiameterCm(option.diameter)).join(", ")
+                  : "Aucun diametre de la liste de reference"
+              }</span>
             </div>
           </div>
         </div>
@@ -474,11 +458,9 @@ export function renderSummary(dom, room, candidates, brasse2Models) {
       diameterSummary.detail
     ),
     createSummaryCard(
-      "Base BRASSE II",
-      compatibleModels.length > 0
-        ? `${compatibleModels.length} modeles`
-        : "Aucun modele compatible",
-      "Compatibles avec les options affichees"
+      "Catalogue BRASSE II",
+      compatibleModels.length > 0 ? `${compatibleModels.length} modeles compatibles` : "Aucun modele compatible",
+      "Compatibilite calculee sur les options affichees"
     )
   ].join("");
   dom.highlights.innerHTML = "";
@@ -502,7 +484,7 @@ export function renderStatusNote(
         <div class="notice warning">
           <strong>Le meilleur cas passe en low-profile.</strong>
           Le guide indique alors une baisse de vitesse d'air d'environ 15 %. Une variante standard est egalement
-          affichee plus bas si elle existe. Le diametre retenu est choisi ici parmi les diametres reels disponibles.
+          affichee plus bas si elle existe.
         </div>
       `);
     }

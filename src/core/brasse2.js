@@ -1,30 +1,35 @@
 import { EPS } from "./constants.js";
+import {
+  getCoverageFactorForDiameter,
+  isCoverageFactorValid
+} from "./calepinage.js";
 
 /**
- * Retourne tous les modeles BRASSE II compatibles avec les diametres admissibles
- * d'une option de calepinage.
+ * Enrichit les modeles BRASSE II avec des indicateurs de compatibilite pour une
+ * option (dimensionnement theorique, montage, FCC derive).
  */
 export function getBrasse2ModelsForCandidate(candidate, brasse2Models) {
-  const optionsByDiameterCm = new Map(
-    candidate.compatibleRealDiameters.map((option) => [Math.round(option.diameter * 100), option])
-  );
+  const maxDiameterCm = Math.round(candidate.theoreticalMaxDiameter * 100);
 
-  return brasse2Models
-    .filter((model) => optionsByDiameterCm.has(model.diameterCm))
-    .map((model) => ({
+  return brasse2Models.map((model) => {
+    const modelDiameter = model.diameterCm / 100;
+    const coverageFactor = getCoverageFactorForDiameter(candidate.cellArea, modelDiameter);
+    const coverageValid = isCoverageFactorValid(coverageFactor);
+    const sizeFits = model.diameterCm <= maxDiameterCm + 0.5;
+    const targetCeilingDistanceCm = candidate.mountMode.factor * modelDiameter * 100;
+
+    return {
       ...model,
-      compatibleOption: optionsByDiameterCm.get(model.diameterCm),
-      mountFits:
-        model.ceilingDistanceCm <=
-        candidate.mountMode.factor * optionsByDiameterCm.get(model.diameterCm).diameter * 100 + 0.5,
-      mountDeltaCm: Number(
-        (
-          candidate.mountMode.factor * optionsByDiameterCm.get(model.diameterCm).diameter * 100 -
-          model.ceilingDistanceCm
-        ).toFixed(1)
-      ),
-      isSelectedDiameter: Math.abs(model.diameterCm - Math.round(candidate.diameter * 100)) <= 0.5
-    }));
+      sizing: {
+        diameter: modelDiameter,
+        coverageFactor,
+        coverageValid,
+        sizeFits
+      },
+      mountFits: model.ceilingDistanceCm <= targetCeilingDistanceCm + 0.5,
+      mountDeltaCm: Number((targetCeilingDistanceCm - model.ceilingDistanceCm).toFixed(1))
+    };
+  });
 }
 
 export function pickBestModel(models, comparator) {
@@ -62,12 +67,8 @@ export function compareAcoustics(a, b) {
 }
 
 export function compareCoverage(a, b) {
-  const coverageA = Number.isFinite(a.compatibleOption?.coverageFactor)
-    ? a.compatibleOption.coverageFactor
-    : -Infinity;
-  const coverageB = Number.isFinite(b.compatibleOption?.coverageFactor)
-    ? b.compatibleOption.coverageFactor
-    : -Infinity;
+  const coverageA = Number.isFinite(a.sizing?.coverageFactor) ? a.sizing.coverageFactor : -Infinity;
+  const coverageB = Number.isFinite(b.sizing?.coverageFactor) ? b.sizing.coverageFactor : -Infinity;
 
   if (Math.abs(coverageB - coverageA) > EPS) {
     return coverageB - coverageA;

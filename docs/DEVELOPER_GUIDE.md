@@ -71,13 +71,13 @@ Les contraintes de hauteur sont calculees par `buildHeightFeasibility()`. Le mon
 
 La hauteur sous pales est `room.height - mountFactor * D`. Les petits brasseurs et grands brasseurs utilisent les seuils definis dans `src/core/constants.js`.
 
-Les diametres reels viennent exclusivement des diametres presents dans la base BRASSE II. `getCompatibleRealDiameters()` conserve les diametres qui tombent dans les intervalles admissibles et dont le `FCC reel = D / sqrt(cellArea)` reste dans `[0.2 ; 0.4]`.
+Le dimensionnement theorique recommande le diametre theorique maximal optimal (D = theoreticalMaxDiameter). La liste `candidate.compatibleRealDiameters` reste disponible pour information en filtrant les diametres de la base BRASSE II qui tombent dans les intervalles admissibles et dont le `FCC = D / sqrt(cellArea)` reste dans `[0.2 ; 0.4]`.
 
 Le tri des options est defini par `compareCandidates()` :
 
-- plus grand diametre reel retenu
+- plus grand diametre theorique recommande
 - facteur de forme le plus proche de `1`
-- FCC reel le plus proche de `0.4`
+- FCC calcule le plus proche de `0.4`
 - montage `standard` avant `low-profile`
 - moins de brasseurs a egalite
 
@@ -87,18 +87,17 @@ Le fallback `flush` est calcule par `getFallbackFlushCandidate()` uniquement si 
 
 `src/core/brasse2.js` est le point d'entree pour relier les options de calepinage aux modeles BRASSE II.
 
-`getBrasse2ModelsForCandidate(candidate, brasse2Models)` retourne tous les modeles dont le diametre est dans `candidate.compatibleRealDiameters`. Ce filtrage ne se limite pas au diametre retenu : il inclut aussi les diametres BRASSE II admissibles pour l'option.
+`getBrasse2ModelsForCandidate(candidate, brasse2Models)` enrichit tous les modeles du catalogue avec des indicateurs de compatibilite (taille, montage, FCC derive) par rapport au candidat.
 
 Chaque modele compatible recoit des champs calcules :
 
-- `compatibleOption` : diametre admissible et FCC associe
+- `sizing` : contient `diameter` (diametre nominal en m), `coverageFactor` (FCC associe), `coverageValid` (si FCC valide), et `sizeFits` (si le diametre nominal est inférieur ou égal au diametre theorique maximum recommande)
 - `mountFits` : compatibilite rapide entre la distance plafond/BA du modele et la distance visee par le montage
 - `mountDeltaCm` : marge en centimetres
-- `isSelectedDiameter` : indique si le modele correspond au diametre retenu
 
 Les cartes de modeles sont produites par `buildModelPicks()` :
 
-- `FCC` : plus fort FCC reel, avec departage par confort
+- `FCC` : plus fort FCC du modele sur la cellule, avec departage par confort
 - `Confort` : meilleur `CE direct debout Vmax`, puis bruit, puis puissance
 - `Efficacite` : meilleur `CFE direct debout Vmax`, puis bruit, puis confort
 - `Acoustique` : plus faible `LwA Vmax`, puis confort, puis puissance

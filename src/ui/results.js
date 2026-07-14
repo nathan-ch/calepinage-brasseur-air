@@ -347,6 +347,28 @@ function candidateCard(candidate, rank, brasse2Models, realDiameters, selectedOp
   const warnings = getCandidateWarnings(candidate);
   const isSelectedForExport = selectedOptionKeys.has(candidate.key);
 
+  const fcc = candidate.coverageFactor;
+  const fccVal = Math.max(0.2, Math.min(0.4, fcc));
+  const fccProgress = ((fccVal - 0.2) / 0.2) * 100;
+  let fccTextColor = "#6b7280";
+  let fccBarColor = "#e5e7eb";
+
+  if (fcc >= 0.2 && fcc <= 0.4) {
+    if (fcc < 0.26) {
+      fccTextColor = "#b45309";
+      fccBarColor = "#d97706";
+    } else if (fcc < 0.33) {
+      fccTextColor = "#4d7c0f";
+      fccBarColor = "#65a30d";
+    } else {
+      fccTextColor = "#15803d";
+      fccBarColor = "#16a34a";
+    }
+  } else {
+    fccTextColor = "#b91c1c";
+    fccBarColor = "#dc2626";
+  }
+
   const title = candidate.isCustom ? "Configuration personnalisée" : `Option ${rank}`;
   let badge = "";
   let customAlertsHtml = "";
@@ -426,7 +448,10 @@ function candidateCard(candidate, rank, brasse2Models, realDiameters, selectedOp
             </div>
             <div class="metric-card">
               <strong>FCC reel</strong>
-              <span>${formatFactor(candidate.coverageFactor)}</span>
+              <span style="color: ${fccTextColor};">${formatFactor(candidate.coverageFactor)}</span>
+              <div class="fcc-bar-bg" style="margin-top: 6px; height: 4px; background: #e5e7eb; border-radius: 2px; width: 100%; overflow: hidden;">
+                <div class="fcc-bar-fill" style="height: 100%; width: ${fccProgress}%; background-color: ${fccBarColor}; border-radius: 2px;"></div>
+              </div>
             </div>
           </div>
 

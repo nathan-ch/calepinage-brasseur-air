@@ -11,6 +11,7 @@ import {
   formatTemp,
   formatDb,
   formatWatts,
+  formatSpeed,
   formatDateTime,
   formatDiameterCm,
   formatDiameterCmList,
@@ -50,6 +51,8 @@ test("formatters - units and diameters formatting", () => {
   assert.equal(formatTemp(28.5), "28,5 °C");
   assert.equal(formatDb(45.2), "45,2 dBA");
   assert.equal(formatWatts(65), "65 W");
+  assert.equal(formatSpeed(1.234), "1,23 m/s");
+  assert.equal(formatSpeed(null), "—");
   assert.equal(formatDiameterCm(1.62), "162");
   assert.equal(formatDiameterCmList([1.62, { diameter: 1.42 }]), "162, 142");
   assert.equal(formatDiameterList([1.62, 1.42]), "1,62 m, 1,42 m");

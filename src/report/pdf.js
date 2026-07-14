@@ -208,8 +208,6 @@ function renderUniformityOptionPage(state, option) {
     if (!c.heightRangeOk) {
       customAlerts.push(`Hauteur de fonctionnement non optimale (${formatMeters(option.bladeHeight)})`);
     }
-  } else if (option.isMarketAlternative) {
-    customAlerts.push("Le diametre choisi est compris dans les diametres courants.");
   }
 
   const allWarnings = [...customAlerts, ...getCandidateWarnings(option)];

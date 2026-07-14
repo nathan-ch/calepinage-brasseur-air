@@ -88,7 +88,7 @@ test("messages - getCandidateWarnings", () => {
   assert.equal(warningsTooHigh.length, 1);
   assert.match(warningsTooHigh[0], /Recommandation pour garantir la performance.*la hauteur sous pales.*est trop importante.*hauteur pales\/plafond.*0,86 m.*hauteur sous pales optimale/);
 
-  // Too low alert: room.height = 3.0, diameter = 2.50, bladeHeight = 1.80 (below 0.8*D = 2.00)
+  // Too low alert: room.height = 3.0, diameter = 2.50 (triggers diameter > 1.62 too), bladeHeight = 1.80 (below 0.8*D = 2.00)
   const candidateTooLow = {
     fanClass: "large",
     diameter: 2.50,
@@ -99,6 +99,21 @@ test("messages - getCandidateWarnings", () => {
     room: { height: 3.0 }
   };
   const warningsTooLow = getCandidateWarnings(candidateTooLow);
-  assert.equal(warningsTooLow.length, 1);
+  assert.equal(warningsTooLow.length, 2);
   assert.match(warningsTooLow[0], /La hauteur sous pales.*est trop faible/);
+  assert.match(warningsTooLow[1], /Diametre hors gamme courante/);
+
+  // Normal diameter but too low: D = 1.32 (<= 1.62), bladeHeight = 1.0 (triggers only too low warning)
+  const candidateNormalTooLow = {
+    fanClass: "small",
+    diameter: 1.32,
+    bladeHeight: 1.0,
+    heightRangeOk: false,
+    recommendedSmallHeightMet: true,
+    mountMode: { id: "standard" },
+    room: { height: 3.0 }
+  };
+  const warningsNormalTooLow = getCandidateWarnings(candidateNormalTooLow);
+  assert.equal(warningsNormalTooLow.length, 1);
+  assert.match(warningsNormalTooLow[0], /La hauteur sous pales.*est trop faible/);
 });

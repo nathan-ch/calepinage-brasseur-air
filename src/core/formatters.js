@@ -57,6 +57,13 @@ export function formatWatts(value, digits = 0) {
   return `${formatNumber(value, digits)} W`;
 }
 
+export function formatSpeed(value, digits = 2) {
+  if (value === null || value === undefined) {
+    return "—";
+  }
+  return `${formatNumber(value, digits)} m/s`;
+}
+
 export function formatDateTime(value = new Date()) {
   return new Intl.DateTimeFormat("fr-FR", {
     dateStyle: "medium",

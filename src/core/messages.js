@@ -56,5 +56,11 @@ export function getCandidateWarnings(candidate) {
     }
   }
 
+  if (candidate.diameter > 1.62 + EPS) {
+    warnings.push(
+      "Diametre hors gamme courante (> 1,62 m). Les modeles de cette taille sont plus difficiles a trouver sur le marche actuellement."
+    );
+  }
+
   return warnings;
 }

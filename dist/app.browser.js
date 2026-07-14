@@ -1203,6 +1203,13 @@ function formatWatts(value, digits = 0) {
   return `${formatNumber(value, digits)} W`;
 }
 
+function formatSpeed(value, digits = 2) {
+  if (value === null || value === undefined) {
+    return "—";
+  }
+  return `${formatNumber(value, digits)} m/s`;
+}
+
 function formatDateTime(value = new Date()) {
   return new Intl.DateTimeFormat("fr-FR", {
     dateStyle: "medium",
@@ -1395,6 +1402,12 @@ function getCandidateWarnings(candidate) {
         `La hauteur sous pales (${formatMeters(candidate.bladeHeight)}) est trop faible pour assurer un bon fonctionnement (minimum de 0,8 D, soit ${formatMeters(0.8 * candidate.diameter)}).`
       );
     }
+  }
+
+  if (candidate.diameter > 1.62 + EPS) {
+    warnings.push(
+      "Diametre hors gamme courante (> 1,62 m). Les modeles de cette taille sont plus difficiles a trouver sur le marche actuellement."
+    );
   }
 
   return warnings;
@@ -2092,6 +2105,8 @@ function renderCatalogTable(models) {
             <th>H test</th>
             <th>CE dir debout</th>
             <th>CE moyen</th>
+            <th>V. assis Vmax</th>
+            <th>V. moyenne Vmax</th>
             <th>LwA Vmin</th>
             <th>LwA Vmax</th>
             <th>P max</th>
@@ -2112,6 +2127,8 @@ function renderCatalogTable(models) {
                   <td>${formatNumber(model.testHeightCm, 1)} cm</td>
                   <td>${formatTemp(model.ceDirDeboutMax)}</td>
                   <td>${formatTemp(model.ceAvgMax)}</td>
+                  <td>${formatSpeed(model.vDirAssisMax)}</td>
+                  <td>${formatSpeed(model.vAvgMax)}</td>
                   <td>${formatDb(model.lwaMinDbA)}</td>
                   <td>${formatDb(model.lwaMaxDbA)}</td>
                   <td>${formatWatts(model.powerMaxW, 0)}</td>
@@ -2608,6 +2625,8 @@ function renderModelsTable(models) {
             <th>Plafond/BA</th>
             <th>CE dir debout Vmax</th>
             <th>CE moyen Vmax</th>
+            <th>V. assis Vmax</th>
+            <th>V. moyenne Vmax</th>
             <th>LwA Vmin</th>
             <th>LwA Vmax</th>
             <th>Lecture montage</th>
@@ -2629,6 +2648,8 @@ function renderModelsTable(models) {
                   <td>${formatNumber(model.ceilingDistanceCm, 1)} cm</td>
                   <td>${formatTemp(model.ceDirDeboutMax)}</td>
                   <td>${formatTemp(model.ceAvgMax)}</td>
+                  <td>${formatSpeed(model.vDirAssisMax)}</td>
+                  <td>${formatSpeed(model.vAvgMax)}</td>
                   <td>${formatDb(model.lwaMinDbA)}</td>
                   <td>${formatDb(model.lwaMaxDbA)}</td>
                   <td>${modelMountLabel(model)}</td>
@@ -2830,13 +2851,6 @@ function candidateCard(candidate, rank, brasse2Models, realDiameters, selectedOp
         </div>
       `;
     }
-  } else if (candidate.isMarketAlternative) {
-    badge = "";
-    customAlertsHtml = `
-      <div class="notice success" style="margin-bottom: 12px;">
-        Le diametre choisi est compris dans les diametres courants.
-      </div>
-    `;
   }
 
   return `
@@ -3220,8 +3234,6 @@ function renderUniformityOptionPage(state, option) {
     if (!c.heightRangeOk) {
       customAlerts.push(`Hauteur de fonctionnement non optimale (${formatMeters(option.bladeHeight)})`);
     }
-  } else if (option.isMarketAlternative) {
-    customAlerts.push("Le diametre choisi est compris dans les diametres courants.");
   }
 
   const allWarnings = [...customAlerts, ...getCandidateWarnings(option)];

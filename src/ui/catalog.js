@@ -8,7 +8,8 @@ import {
   formatDb,
   formatNumber,
   formatTemp,
-  formatWatts
+  formatWatts,
+  formatSpeed
 } from "../core/formatters.js";
 
 function setCatalogSelectOptions(select, options, emptyLabel, formatter = (value) => value) {
@@ -75,6 +76,8 @@ function renderCatalogTable(models) {
             <th>H test</th>
             <th>CE dir debout</th>
             <th>CE moyen</th>
+            <th>V. assis Vmax</th>
+            <th>V. moyenne Vmax</th>
             <th>LwA Vmin</th>
             <th>LwA Vmax</th>
             <th>P max</th>
@@ -95,6 +98,8 @@ function renderCatalogTable(models) {
                   <td>${formatNumber(model.testHeightCm, 1)} cm</td>
                   <td>${formatTemp(model.ceDirDeboutMax)}</td>
                   <td>${formatTemp(model.ceAvgMax)}</td>
+                  <td>${formatSpeed(model.vDirAssisMax)}</td>
+                  <td>${formatSpeed(model.vAvgMax)}</td>
                   <td>${formatDb(model.lwaMinDbA)}</td>
                   <td>${formatDb(model.lwaMaxDbA)}</td>
                   <td>${formatWatts(model.powerMaxW, 0)}</td>

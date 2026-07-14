@@ -19,7 +19,8 @@ import {
   formatMeters,
   formatNumber,
   formatSquareMeters,
-  formatTemp
+  formatTemp,
+  formatSpeed
 } from "../core/formatters.js";
 import { planWrapStyle, svgForCandidate } from "./planSvg.js";
 
@@ -186,6 +187,8 @@ function renderModelsTable(models) {
             <th>Plafond/BA</th>
             <th>CE dir debout Vmax</th>
             <th>CE moyen Vmax</th>
+            <th>V. assis Vmax</th>
+            <th>V. moyenne Vmax</th>
             <th>LwA Vmin</th>
             <th>LwA Vmax</th>
             <th>Lecture montage</th>
@@ -207,6 +210,8 @@ function renderModelsTable(models) {
                   <td>${formatNumber(model.ceilingDistanceCm, 1)} cm</td>
                   <td>${formatTemp(model.ceDirDeboutMax)}</td>
                   <td>${formatTemp(model.ceAvgMax)}</td>
+                  <td>${formatSpeed(model.vDirAssisMax)}</td>
+                  <td>${formatSpeed(model.vAvgMax)}</td>
                   <td>${formatDb(model.lwaMinDbA)}</td>
                   <td>${formatDb(model.lwaMaxDbA)}</td>
                   <td>${modelMountLabel(model)}</td>
@@ -408,13 +413,6 @@ function candidateCard(candidate, rank, brasse2Models, realDiameters, selectedOp
         </div>
       `;
     }
-  } else if (candidate.isMarketAlternative) {
-    badge = "";
-    customAlertsHtml = `
-      <div class="notice success" style="margin-bottom: 12px;">
-        Le diametre choisi est compris dans les diametres courants.
-      </div>
-    `;
   }
 
   return `

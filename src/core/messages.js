@@ -37,5 +37,24 @@ export function getCandidateWarnings(candidate) {
   if (candidate.mountMode.id === "low-profile") {
     warnings.push(candidate.mountMode.penaltyText);
   }
+
+  const heightRangeOk = candidate.isCustom
+    ? candidate.conformity?.heightRangeOk
+    : candidate.heightRangeOk;
+
+  if (heightRangeOk === false) {
+    if (candidate.bladeHeight > 2 * candidate.diameter + EPS) {
+      const targetBladeHeight = 2 * candidate.diameter;
+      const targetMountDistance = candidate.room.height - targetBladeHeight;
+      warnings.push(
+        `Recommandation pour garantir la performance : la hauteur sous pales (${formatMeters(candidate.bladeHeight)}) est trop importante par rapport au diametre (regle pour assurer la vitesse d'air au sol : hauteur sous pales < 2 × diametre, soit ${formatMeters(2 * candidate.diameter)}). Il est recommande d'utiliser une suspension (hauteur pales/plafond) de ${formatMeters(targetMountDistance)} pour obtenir une hauteur sous pales optimale de ${formatMeters(targetBladeHeight)}.`
+      );
+    } else if (candidate.bladeHeight < 0.8 * candidate.diameter - EPS) {
+      warnings.push(
+        `La hauteur sous pales (${formatMeters(candidate.bladeHeight)}) est trop faible pour assurer un bon fonctionnement (minimum de 0,8 D, soit ${formatMeters(0.8 * candidate.diameter)}).`
+      );
+    }
+  }
+
   return warnings;
 }

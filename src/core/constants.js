@@ -16,7 +16,7 @@ export const MOUNT_MODES = [
     id: "low-profile",
     label: "Montage low-profile",
     factor: 0.25,
-    penaltyText: "Reduction de vitesse d'air d'environ 15 % selon le guide.",
+    penaltyText: "En raison de la faible distance pales/plafond, la vitesse d'air au sol subit une reduction d'environ 15 % selon le guide.",
     severity: "warn"
   }
 ];
@@ -26,6 +26,6 @@ export const FLUSH_MODE = {
   label: "Montage flush",
   factor: 0.15,
   penaltyText:
-    "Perte de performance de plus de 40 % ; le guide demande de l'eviter au maximum.",
+    "En raison de la tres faible distance pales/plafond, la perte de vitesse d'air au sol depasse 40 % ; le guide recommande d'eviter ce montage au maximum.",
   severity: "alert"
 };

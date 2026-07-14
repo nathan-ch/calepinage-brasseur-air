@@ -1129,7 +1129,7 @@ const MOUNT_MODES = [
     id: "low-profile",
     label: "Montage low-profile",
     factor: 0.25,
-    penaltyText: "Reduction de vitesse d'air d'environ 15 % selon le guide.",
+    penaltyText: "En raison de la faible distance pales/plafond, la vitesse d'air au sol subit une reduction d'environ 15 % selon le guide.",
     severity: "warn"
   }
 ];
@@ -1139,7 +1139,7 @@ const FLUSH_MODE = {
   label: "Montage flush",
   factor: 0.15,
   penaltyText:
-    "Perte de performance de plus de 40 % ; le guide demande de l'eviter au maximum.",
+    "En raison de la tres faible distance pales/plafond, la perte de vitesse d'air au sol depasse 40 % ; le guide recommande d'eviter ce montage au maximum.",
   severity: "alert"
 };
 
@@ -1378,6 +1378,25 @@ function getCandidateWarnings(candidate) {
   if (candidate.mountMode.id === "low-profile") {
     warnings.push(candidate.mountMode.penaltyText);
   }
+
+  const heightRangeOk = candidate.isCustom
+    ? candidate.conformity?.heightRangeOk
+    : candidate.heightRangeOk;
+
+  if (heightRangeOk === false) {
+    if (candidate.bladeHeight > 2 * candidate.diameter + EPS) {
+      const targetBladeHeight = 2 * candidate.diameter;
+      const targetMountDistance = candidate.room.height - targetBladeHeight;
+      warnings.push(
+        `Recommandation pour garantir la performance : la hauteur sous pales (${formatMeters(candidate.bladeHeight)}) est trop importante par rapport au diametre (regle pour assurer la vitesse d'air au sol : hauteur sous pales < 2 × diametre, soit ${formatMeters(2 * candidate.diameter)}). Il est recommande d'utiliser une suspension (hauteur pales/plafond) de ${formatMeters(targetMountDistance)} pour obtenir une hauteur sous pales optimale de ${formatMeters(targetBladeHeight)}.`
+      );
+    } else if (candidate.bladeHeight < 0.8 * candidate.diameter - EPS) {
+      warnings.push(
+        `La hauteur sous pales (${formatMeters(candidate.bladeHeight)}) est trop faible pour assurer un bon fonctionnement (minimum de 0,8 D, soit ${formatMeters(0.8 * candidate.diameter)}).`
+      );
+    }
+  }
+
   return warnings;
 }
 
@@ -1626,14 +1645,13 @@ function getCompatibleRealDiameters(realDiameters, intervals, cellArea) {
  * de hauteur pour un mode de montage donne.
  */
 function buildHeightFeasibility(height, mountFactor, dGeoMin, dGeoMax) {
-  const lowerHeightBound = height / (2 + mountFactor);
   const intervals = [];
 
   const smallUpper = Math.min(
     SMALL_FAN_LIMIT - EPS,
     (height - SMALL_SAFETY_HEIGHT) / mountFactor
   );
-  const smallLower = Math.max(dGeoMin, lowerHeightBound);
+  const smallLower = dGeoMin;
   if (smallUpper > smallLower + EPS) {
     intervals.push({
       fanClass: "small",
@@ -1647,7 +1665,7 @@ function buildHeightFeasibility(height, mountFactor, dGeoMin, dGeoMax) {
     height / (0.8 + mountFactor),
     dGeoMax
   );
-  const largeLower = Math.max(dGeoMin, lowerHeightBound, SMALL_FAN_LIMIT);
+  const largeLower = Math.max(dGeoMin, SMALL_FAN_LIMIT);
   if (largeUpper > largeLower + EPS) {
     intervals.push({
       fanClass: "large",
@@ -1716,6 +1734,14 @@ function evaluateCandidate(room, nx, ny, mountMode, realDiameters) {
       ? bladeHeight >= recommendedSmallHeight - EPS
       : true;
 
+  const isSmall = diameter < 2.13;
+  let heightRangeOk = false;
+  if (isSmall) {
+    heightRangeOk = bladeHeight <= 2 * diameter + EPS;
+  } else {
+    heightRangeOk = bladeHeight >= 0.8 * diameter - EPS && bladeHeight <= 2 * diameter + EPS;
+  }
+
   const coordinates = [];
   for (let ix = 0; ix < nx; ix += 1) {
     for (let iy = 0; iy < ny; iy += 1) {
@@ -1746,6 +1772,7 @@ function evaluateCandidate(room, nx, ny, mountMode, realDiameters) {
     bladeHeight,
     recommendedSmallHeightMet,
     recommendedSmallHeight,
+    heightRangeOk,
     wallClearance: cellShort / 2,
     interFanSpacing: spacings.length > 0 ? Math.min(...spacings) : null,
     geometryCaps: {
@@ -2756,14 +2783,6 @@ function candidateCard(candidate, rank, brasse2Models, realDiameters, selectedOp
           Cette configuration respecte toutes les regles de securite et de distance reglementaires.
         </div>
       `;
-      if (!c.heightRangeOk) {
-        const range = candidate.diameter < 2.13 ? "inférieure à 2 D" : "comprise entre 0,8 D et 2 D";
-        customAlertsHtml += `
-          <div class="notice warning" style="margin-bottom: 12px;">
-            <strong>Hauteur de fonctionnement non optimale</strong> : la hauteur sous pales (${formatMeters(candidate.bladeHeight)}) doit être ${range} (${formatMeters(2 * candidate.diameter)} pour ce diametre) pour assurer un bon confort. Envisagez d'ajuster la longueur de la suspension (tige).
-          </div>
-        `;
-      }
     } else {
       badge = `<span class="badge danger">Non conforme</span>`;
       const alerts = [];
@@ -2788,14 +2807,6 @@ function candidateCard(candidate, rank, brasse2Models, realDiameters, selectedOp
           </ul>
         </div>
       `;
-      if (!c.heightRangeOk) {
-        const range = candidate.diameter < 2.13 ? "inférieure à 2 D" : "comprise entre 0,8 D et 2 D";
-        customAlertsHtml += `
-          <div class="notice warning" style="margin-bottom: 12px;">
-            <strong>Hauteur de fonctionnement non optimale</strong> : la hauteur sous pales (${formatMeters(candidate.bladeHeight)}) doit être ${range} (${formatMeters(2 * candidate.diameter)} pour ce diametre) pour assurer un bon confort. Envisagez d'ajuster la longueur de la suspension (tige).
-          </div>
-        `;
-      }
     }
   } else if (candidate.isMarketAlternative) {
     badge = "";
@@ -2874,9 +2885,11 @@ function candidateCard(candidate, rank, brasse2Models, realDiameters, selectedOp
       </div>
 
       ${warnings.length > 0 ? `
-        <div class="notice warning">
-          <strong>Point d'attention.</strong>
-          ${warnings.join(" ")}
+        <div class="notice warning" style="margin-bottom: 12px;">
+          <strong>Point d'attention :</strong>
+          <ul style="margin: 8px 0 0; padding-left: 18px;">
+            ${warnings.map((w) => `<li style="margin-bottom: 4px;">${w}</li>`).join("")}
+          </ul>
         </div>
       ` : ""}
 

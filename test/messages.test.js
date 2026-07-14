@@ -73,4 +73,32 @@ test("messages - getCandidateWarnings", () => {
 
   const warningsBoth = getCandidateWarnings(candidateBothAlerts);
   assert.equal(warningsBoth.length, 2);
+
+  // Too high alert: room.height = 3.5, diameter = 1.32, bladeHeight = 3.04 (exceeds 2*D = 2.64)
+  const candidateTooHigh = {
+    fanClass: "small",
+    diameter: 1.32,
+    bladeHeight: 3.04,
+    heightRangeOk: false,
+    recommendedSmallHeightMet: true,
+    mountMode: { id: "standard" },
+    room: { height: 3.5 }
+  };
+  const warningsTooHigh = getCandidateWarnings(candidateTooHigh);
+  assert.equal(warningsTooHigh.length, 1);
+  assert.match(warningsTooHigh[0], /Recommandation pour garantir la performance.*la hauteur sous pales.*est trop importante.*hauteur pales\/plafond.*0,86 m.*hauteur sous pales optimale/);
+
+  // Too low alert: room.height = 3.0, diameter = 2.50, bladeHeight = 1.80 (below 0.8*D = 2.00)
+  const candidateTooLow = {
+    fanClass: "large",
+    diameter: 2.50,
+    bladeHeight: 1.80,
+    heightRangeOk: false,
+    recommendedSmallHeightMet: true,
+    mountMode: { id: "standard" },
+    room: { height: 3.0 }
+  };
+  const warningsTooLow = getCandidateWarnings(candidateTooLow);
+  assert.equal(warningsTooLow.length, 1);
+  assert.match(warningsTooLow[0], /La hauteur sous pales.*est trop faible/);
 });

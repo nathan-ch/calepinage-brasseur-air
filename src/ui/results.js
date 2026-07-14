@@ -361,14 +361,6 @@ function candidateCard(candidate, rank, brasse2Models, realDiameters, selectedOp
           Cette configuration respecte toutes les regles de securite et de distance reglementaires.
         </div>
       `;
-      if (!c.heightRangeOk) {
-        const range = candidate.diameter < 2.13 ? "inférieure à 2 D" : "comprise entre 0,8 D et 2 D";
-        customAlertsHtml += `
-          <div class="notice warning" style="margin-bottom: 12px;">
-            <strong>Hauteur de fonctionnement non optimale</strong> : la hauteur sous pales (${formatMeters(candidate.bladeHeight)}) doit être ${range} (${formatMeters(2 * candidate.diameter)} pour ce diametre) pour assurer un bon confort. Envisagez d'ajuster la longueur de la suspension (tige).
-          </div>
-        `;
-      }
     } else {
       badge = `<span class="badge danger">Non conforme</span>`;
       const alerts = [];
@@ -393,14 +385,6 @@ function candidateCard(candidate, rank, brasse2Models, realDiameters, selectedOp
           </ul>
         </div>
       `;
-      if (!c.heightRangeOk) {
-        const range = candidate.diameter < 2.13 ? "inférieure à 2 D" : "comprise entre 0,8 D et 2 D";
-        customAlertsHtml += `
-          <div class="notice warning" style="margin-bottom: 12px;">
-            <strong>Hauteur de fonctionnement non optimale</strong> : la hauteur sous pales (${formatMeters(candidate.bladeHeight)}) doit être ${range} (${formatMeters(2 * candidate.diameter)} pour ce diametre) pour assurer un bon confort. Envisagez d'ajuster la longueur de la suspension (tige).
-          </div>
-        `;
-      }
     }
   } else if (candidate.isMarketAlternative) {
     badge = "";
@@ -479,9 +463,11 @@ function candidateCard(candidate, rank, brasse2Models, realDiameters, selectedOp
       </div>
 
       ${warnings.length > 0 ? `
-        <div class="notice warning">
-          <strong>Point d'attention.</strong>
-          ${warnings.join(" ")}
+        <div class="notice warning" style="margin-bottom: 12px;">
+          <strong>Point d'attention :</strong>
+          <ul style="margin: 8px 0 0; padding-left: 18px;">
+            ${warnings.map((w) => `<li style="margin-bottom: 4px;">${w}</li>`).join("")}
+          </ul>
         </div>
       ` : ""}
 

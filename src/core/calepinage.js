@@ -55,14 +55,13 @@ export function getCompatibleRealDiameters(realDiameters, intervals, cellArea) {
  * de hauteur pour un mode de montage donne.
  */
 export function buildHeightFeasibility(height, mountFactor, dGeoMin, dGeoMax) {
-  const lowerHeightBound = height / (2 + mountFactor);
   const intervals = [];
 
   const smallUpper = Math.min(
     SMALL_FAN_LIMIT - EPS,
     (height - SMALL_SAFETY_HEIGHT) / mountFactor
   );
-  const smallLower = Math.max(dGeoMin, lowerHeightBound);
+  const smallLower = dGeoMin;
   if (smallUpper > smallLower + EPS) {
     intervals.push({
       fanClass: "small",
@@ -76,7 +75,7 @@ export function buildHeightFeasibility(height, mountFactor, dGeoMin, dGeoMax) {
     height / (0.8 + mountFactor),
     dGeoMax
   );
-  const largeLower = Math.max(dGeoMin, lowerHeightBound, SMALL_FAN_LIMIT);
+  const largeLower = Math.max(dGeoMin, SMALL_FAN_LIMIT);
   if (largeUpper > largeLower + EPS) {
     intervals.push({
       fanClass: "large",
@@ -145,6 +144,14 @@ export function evaluateCandidate(room, nx, ny, mountMode, realDiameters) {
       ? bladeHeight >= recommendedSmallHeight - EPS
       : true;
 
+  const isSmall = diameter < 2.13;
+  let heightRangeOk = false;
+  if (isSmall) {
+    heightRangeOk = bladeHeight <= 2 * diameter + EPS;
+  } else {
+    heightRangeOk = bladeHeight >= 0.8 * diameter - EPS && bladeHeight <= 2 * diameter + EPS;
+  }
+
   const coordinates = [];
   for (let ix = 0; ix < nx; ix += 1) {
     for (let iy = 0; iy < ny; iy += 1) {
@@ -175,6 +182,7 @@ export function evaluateCandidate(room, nx, ny, mountMode, realDiameters) {
     bladeHeight,
     recommendedSmallHeightMet,
     recommendedSmallHeight,
+    heightRangeOk,
     wallClearance: cellShort / 2,
     interFanSpacing: spacings.length > 0 ? Math.min(...spacings) : null,
     geometryCaps: {

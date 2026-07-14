@@ -20,6 +20,7 @@ export function getBrasse2ModelsForCandidate(candidate, brasse2Models) {
 
     return {
       ...model,
+      cfeDirDeboutMax: model.powerMaxW ? model.ceDirDeboutMax / model.powerMaxW : 0,
       sizing: {
         diameter: modelDiameter,
         coverageFactor,

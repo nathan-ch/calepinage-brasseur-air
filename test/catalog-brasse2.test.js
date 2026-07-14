@@ -55,6 +55,8 @@ test("brasse2 - enrich models verification details", () => {
   assert.ok(typeof model.sizing.sizeFits === "boolean");
   assert.ok(typeof model.mountFits === "boolean");
   assert.ok(Number.isFinite(model.mountDeltaCm));
+  assert.ok(Number.isFinite(model.cfeDirDeboutMax));
+  assert.ok(model.cfeDirDeboutMax > 0);
 });
 
 test("brasse2 - buildModelPicks details", () => {

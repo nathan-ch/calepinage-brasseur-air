@@ -2824,7 +2824,7 @@ function candidateCard(candidate, rank, brasse2Models, realDiameters, selectedOp
       customAlertsHtml = `
         <div class="notice success" style="margin-bottom: 12px;">
           <strong>Calepinage conforme</strong>
-          Cette configuration respecte toutes les regles de securite et de distance reglementaires.
+          Cette configuration respecte toutes les regles de securite et de distance recommandees.
         </div>
       `;
     } else {
@@ -2834,10 +2834,10 @@ function candidateCard(candidate, rank, brasse2Models, realDiameters, selectedOp
         alerts.push(`<strong>Distance aux murs insuffisante</strong> : le diametre (${formatMeters(candidate.diameter)}) depasse la distance entre le centre et le mur le plus proche (${formatMeters(candidate.wallClearance)}).`);
       }
       if (!c.spacingOk) {
-        alerts.push(`<strong>Entraxe insuffisant</strong> : l'entraxe entre ventilateurs (${formatMeters(candidate.interFanSpacing)}) est inferieur a la limite reglementaire de 2.5 D (${formatMeters(2.5 * candidate.diameter)}).`);
+        alerts.push(`<strong>Entraxe insuffisant</strong> : l'entraxe entre ventilateurs (${formatMeters(candidate.interFanSpacing)}) est inferieur a la limite recommandee de 2.5 D (${formatMeters(2.5 * candidate.diameter)}).`);
       }
       if (!c.coverageOk) {
-        alerts.push(`<strong>Facteur de couverture (FCC) non optimal</strong> : le FCC calcule (${formatFactor(candidate.coverageFactor)}) est en dehors de la plage reglementaire de [0,20 - 0,40].`);
+        alerts.push(`<strong>Facteur de couverture (FCC) non optimal</strong> : le FCC calcule (${formatFactor(candidate.coverageFactor)}) est en dehors de la plage recommandee de [0,20 - 0,40].`);
       }
       if (!c.safetyHeightOk) {
         const limit = candidate.diameter < 2.13 ? "2,13 m" : "3,05 m";

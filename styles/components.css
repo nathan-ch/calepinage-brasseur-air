@@ -409,3 +409,13 @@ details.models-details summary {
 .table-wrap tr:last-child td {
   border-bottom: 0;
 }
+
+/* Mobile responsive adjustments for results */
+@media (max-width: 600px) {
+  .result-grid {
+    grid-template-columns: 1fr;
+  }
+  .result-card {
+    padding: 12px;
+  }
+}

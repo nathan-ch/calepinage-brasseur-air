@@ -418,3 +418,20 @@ label {
     width: 100%;
   }
 }
+
+/* Responsive adjustments for mobile */
+@media (max-width: 600px) {
+  .layout {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  /* Stack the results and sidebar vertically */
+  .layout aside.panel,
+  .layout main.results-shell {
+    width: 100%;
+  }
+  /* Result grid (header/detail) becomes single column */
+  .result-grid {
+    grid-template-columns: 1fr;
+  }
+}

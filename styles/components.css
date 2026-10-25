@@ -419,3 +419,106 @@ details.models-details summary {
     padding: 12px;
   }
 }
+
+/* ------------------------------------------------------------------ */
+/*  Info-button + tooltip (FCC / Facteur de forme)                     */
+/* ------------------------------------------------------------------ */
+
+.result-head-actions {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* Label row inside a metric card that hosts an info button */
+.metric-card-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.info-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: #f9fafb;
+  color: var(--muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: color 120ms ease, border-color 120ms ease, background 120ms ease;
+}
+
+.info-btn:hover,
+.info-btn:focus-visible {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: #fff;
+  outline: none;
+}
+
+/* Tooltip bubble */
+.info-tooltip-popup {
+  display: none !important;
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  left: auto;
+  width: 220px;
+  padding: 10px 12px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--ink);
+  z-index: 200;
+  text-align: left;
+  white-space: normal;
+  font-weight: 400;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+/* Reset inherited metric-card strong/span styles inside the tooltip */
+.info-tooltip-popup strong {
+  display: inline !important;
+  font-size: 0.78rem !important;
+  font-weight: 700 !important;
+  text-transform: none !important;
+  letter-spacing: normal !important;
+  color: var(--ink) !important;
+  margin: 0 !important;
+}
+
+/* Show on hover / focus (desktop) */
+.info-btn:hover .info-tooltip-popup,
+.info-btn:focus-visible .info-tooltip-popup {
+  display: block !important;
+}
+
+/* Show when JS adds the .open class (tap on mobile) */
+.info-btn.open .info-tooltip-popup {
+  display: block !important;
+}
+
+@media (max-width: 600px) {
+  .info-tooltip-popup {
+    right: auto;
+    left: 0;
+    width: min(220px, 80vw);
+  }
+
+  /* Facteur de forme : toujours ouvert à gauche même sur mobile */
+  .info-btn--right .info-tooltip-popup {
+    left: auto;
+    right: 0;
+  }
+}

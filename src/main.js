@@ -446,3 +446,18 @@ bindResultsInteractions(dom);
 initializeCatalogFilters(dom, brasse2Models);
 renderCatalog(dom, brasse2Models);
 render();
+
+// ---- Tooltip tap-toggle for touch devices ----
+document.addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-info-tooltip]");
+  if (btn) {
+    e.stopPropagation();
+    const isOpen = btn.classList.contains("open");
+    // Close any other open tooltips first
+    document.querySelectorAll("[data-info-tooltip].open").forEach((el) => el.classList.remove("open"));
+    if (!isOpen) btn.classList.add("open");
+  } else {
+    // Click outside closes all tooltips
+    document.querySelectorAll("[data-info-tooltip].open").forEach((el) => el.classList.remove("open"));
+  }
+});

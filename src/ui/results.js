@@ -440,12 +440,33 @@ function candidateCard(candidate, rank, brasse2Models, realDiameters, selectedOp
               <strong>Diametre theorique recommande</strong>
               <span>${formatMeters(candidate.diameter)}</span>
             </div>
-            <div class="metric-card">
-              <strong>Facteur de forme</strong>
+            <div class="metric-card metric-card--with-info">
+              <div class="metric-card-label">
+                <strong>Facteur de forme</strong>
+                <button class="info-btn info-btn--right" type="button" aria-label="Qu'est-ce que le facteur de forme ?" data-info-tooltip>
+                  <svg aria-hidden="true" width="14" height="14" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="9" cy="9" r="8.5" stroke="currentColor"/><text x="9" y="13.5" text-anchor="middle" font-size="10" fill="currentColor" font-family="system-ui,sans-serif" font-weight="700">i</text></svg>
+                  <div class="info-tooltip-popup" role="tooltip">
+                    <strong>Facteur de forme (FF)</strong><br>
+                    Formule&nbsp;: grand côté / petit côté de la cellule.<br>
+                    Toujours <b>≥ 1</b>. Plus proche de 1, plus la cellule est carrée et la répartition de l'air homogène.
+                  </div>
+                </button>
+              </div>
               <span>${formatFactor(candidate.formFactor)}</span>
             </div>
-            <div class="metric-card">
-              <strong>FCC reel</strong>
+            <div class="metric-card metric-card--with-info">
+              <div class="metric-card-label">
+                <strong>FCC reel</strong>
+                <button class="info-btn" type="button" aria-label="Qu'est-ce que le FCC ?" data-info-tooltip>
+                  <svg aria-hidden="true" width="14" height="14" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="9" cy="9" r="8.5" stroke="currentColor"/><text x="9" y="13.5" text-anchor="middle" font-size="10" fill="currentColor" font-family="system-ui,sans-serif" font-weight="700">i</text></svg>
+                  <div class="info-tooltip-popup" role="tooltip">
+                    <strong>FCC — Facteur de Couverture de Cellule</strong><br>
+                    Formule&nbsp;: D / √(surface de cellule).<br>
+                    Plage valide&nbsp;: <b>0,2 ≤ FCC ≤ 0,4</b>.<br>
+                    Un FCC proche de 0,4 indique une bonne couverture du brasseur sur sa cellule.
+                  </div>
+                </button>
+              </div>
               <span style="color: ${fccTextColor};">${formatFactor(candidate.coverageFactor)}</span>
               <div class="fcc-bar-bg" style="margin-top: 6px; height: 4px; background: #e5e7eb; border-radius: 2px; width: 100%; overflow: hidden;">
                 <div class="fcc-bar-fill" style="height: 100%; width: ${fccProgress}%; background-color: ${fccBarColor}; border-radius: 2px;"></div>
